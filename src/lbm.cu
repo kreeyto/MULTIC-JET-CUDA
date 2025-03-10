@@ -256,7 +256,8 @@ __global__ void fgBoundary(
     const float * __restrict__ normy,
     const float * __restrict__ normz,
     float u_max, int d_half,
-    int nx, int ny, int nz
+    int nx, int ny, int nz,
+    int step, int MACRO_SAVE
 ) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
@@ -267,7 +268,7 @@ __global__ void fgBoundary(
     float nozzle_center_x = nx / 2.0f;
     float nozzle_center_y = ny / 2.0f;
     float nozzle_half = d_half;
-    float u_in = u_max;
+    float u_in = u_max * (1 + DATAZ[step/MACRO_SAVE] * 1000);
     
     if (i < (nozzle_center_x - nozzle_half) || i > (nozzle_center_x + nozzle_half)) return;
     if (j < (nozzle_center_y - nozzle_half) || j > (nozzle_center_y + nozzle_half)) return;

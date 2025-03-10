@@ -97,7 +97,8 @@ __global__ void fgBoundary(
     const float * __restrict__ normy,
     const float * __restrict__ normz,
     float u_max, int d_half,
-    int nx, int ny, int nz
+    int nx, int ny, int nz,
+    int step, int MACRO_SAVE
 );
 
 #endif

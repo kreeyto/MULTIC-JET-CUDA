@@ -18,7 +18,7 @@ __global__ void initTensor(
 
     int idx3D = inline3D(i,j,k,nx,ny);
 
-    float val = 1.0f;
+    float val = 1.0;
     pxx[idx3D] = val; pyy[idx3D] = val; pzz[idx3D] = val;
     pxy[idx3D] = val; pxz[idx3D] = val; pyz[idx3D] = val;
     rho[idx3D] = val;
@@ -34,8 +34,8 @@ __global__ void initPhase(
 
     if (i >= nx || j >= ny || k >= nz) return;
 
-    int inlet_pos_x = nx / 2.0f;
-    int inlet_pos_y = ny / 2.0f;
+    int inlet_pos_x = nx / 2.0;
+    int inlet_pos_y = ny / 2.0;
     int inlet_size = d_half;
 
     if (k == 0 && 
@@ -43,7 +43,7 @@ __global__ void initPhase(
         (j >= inlet_pos_y - inlet_size && j <= inlet_pos_y + inlet_size))     
     {
         int idx = inline3D(i,j,k,nx,ny);
-        phi[idx] = 1.0f;
+        phi[idx] = 1.0;
     }
 }
 
