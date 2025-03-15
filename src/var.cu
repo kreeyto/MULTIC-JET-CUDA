@@ -6,7 +6,7 @@ int diam = 10;
 // extern vars
 int nx = mesh; int ny = mesh; int nz = mesh*4;  
 int d_half = diam/2;
-float u_max = 0.1; 
+float u_max = 0.03; 
 
 __constant__ float TAU;
 __constant__ float CSSQ;
@@ -18,20 +18,21 @@ __constant__ int CIX[FPOINTS], CIY[FPOINTS], CIZ[FPOINTS];
 __constant__ float DATAZ[200];
 
 float *d_f, *d_g;
-float *d_normx, *d_normy, *d_normz;
+float *d_normx, *d_normy, *d_normz, *d_indicator;
+float *d_curvature, *d_ffx, *d_ffy, *d_ffz;
 float *d_ux, *d_uy, *d_uz, *d_pxx, *d_pyy, *d_pzz;
 float *d_pxy, *d_pxz, *d_pyz, *d_rho, *d_phi;
 
 // ========================================================================== parametros ========================================================================== //
 
 // ========== adimensional parameters ========== //
-        const float REYNOLDS = 5000;
+        //const float REYNOLDS = 5000;
         const float WEBER = 1000;
 // ============================================= //
 
-const float visc = u_max + (diam+diam) / REYNOLDS;
-const float h_tau = 0.5 + 3.0 * visc;
-//const float h_tau = 0.505;
+//const float visc = u_max + (diam+diam) / REYNOLDS;
+//const float h_tau = 0.5 + 3.0 * visc;
+const float h_tau = 0.505;
 const float h_cssq = 1.0 / 3.0;
 const float h_omega = 1.0 / h_tau;
 const float h_sharp_c = 0.15 * 3.0;
@@ -110,6 +111,11 @@ void initializeVars() {
     cudaMalloc((void **)&d_normx, size);
     cudaMalloc((void **)&d_normy, size);
     cudaMalloc((void **)&d_normz, size);
+    cudaMalloc((void **)&d_curvature, size);
+    cudaMalloc((void **)&d_indicator, size);
+    cudaMalloc((void **)&d_ffx, size);
+    cudaMalloc((void **)&d_ffy, size);
+    cudaMalloc((void **)&d_ffz, size);
     cudaMalloc((void **)&d_pxx, size);
     cudaMalloc((void **)&d_pyy, size);
     cudaMalloc((void **)&d_pzz, size);
@@ -131,6 +137,11 @@ void initializeVars() {
     cudaMemset(d_normx, 0, size);
     cudaMemset(d_normy, 0, size);
     cudaMemset(d_normz, 0, size);
+    cudaMemset(d_curvature, 0, size);
+    cudaMemset(d_indicator, 0, size);
+    cudaMemset(d_ffx, 0, size);
+    cudaMemset(d_ffy, 0, size);
+    cudaMemset(d_ffz, 0, size);
 
     cudaMemcpyToSymbol(TAU, &h_tau, sizeof(float));
     cudaMemcpyToSymbol(CSSQ, &h_cssq, sizeof(float));

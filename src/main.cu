@@ -31,7 +31,7 @@ int main(int argc, char* argv[]) {
     // ============================================================================================================================================================= //
 
     // ========================= //
-    int stamp = 100, nsteps = 10000;
+    int stamp = 100, nsteps = 25000;
     // ========================= //
     initializeVars();
 
@@ -88,17 +88,32 @@ int main(int argc, char* argv[]) {
 
             gradCalc<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
                 d_phi, d_normx, d_normy, d_normz, 
+                d_indicator, 
                 nx, ny, nz
             ); 
 
         // =================================================== // 
 
 
+
+        // ==================== CURVATURE ==================== //
+
+            curvatureCalc<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
+                d_curvature, d_indicator,
+                d_normx, d_normy, d_normz, 
+                d_ffx, d_ffy, d_ffz,
+                nx, ny, nz
+            ); 
+
+        // =================================================== //   
+
+
         
         // ===================== MOMENTI ===================== //
 
             momentiCalc<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
-                d_ux, d_uy, d_uz, d_rho, d_f,
+                d_ux, d_uy, d_uz, d_rho,
+                d_ffx, d_ffy, d_ffz, d_f,
                 d_pxx, d_pyy, d_pzz,
                 d_pxy, d_pxz, d_pyz,
                 nx, ny, nz
@@ -111,7 +126,8 @@ int main(int argc, char* argv[]) {
         // ==================== COLLISION & STREAMING ==================== //
             
             collisionFluid<<<numBlocks, threadsPerBlock, 0, collFluid>>> (
-                d_f, d_ux, d_uy, d_uz, d_rho,
+                d_f, d_ux, d_uy, d_uz, 
+                d_ffx, d_ffy, d_ffz, d_rho,
                 d_pxx, d_pyy, d_pzz, d_pxy, d_pxz, d_pyz, 
                 nx, ny, nz
             ); 
@@ -134,6 +150,7 @@ int main(int argc, char* argv[]) {
                 d_rho, d_phi,
                 d_ux, d_uy, d_uz, d_f, d_g, 
                 d_normx, d_normy, d_normz,
+                d_ffx, d_ffy, d_ffz,
                 u_max, d_half,
                 nx, ny, nz,
                 t, stamp
@@ -154,16 +171,21 @@ int main(int argc, char* argv[]) {
     cudaStreamDestroy(mainStream);
 
     float *pointers[] = {d_f, d_g, d_phi, d_rho, 
-                          d_normx, d_normy, d_normz,
-                          d_ux, d_uy, d_uz,
-                          d_pxx, d_pyy, d_pzz, 
-                          d_pxy, d_pxz, d_pyz
+                          d_normx, d_normy, d_normz, d_indicator,
+                          d_curvature, d_ffx, d_ffy, d_ffz, d_ux, d_uy, d_uz,
+                          d_pxx, d_pyy, d_pzz, d_pxy, d_pxz, d_pyz
                         };
-    freeMemory(pointers, 16);  
+    freeMemory(pointers, 21);  
 
     auto end_time = chrono::high_resolution_clock::now();
     chrono::duration<double> elapsed_time = end_time - start_time;
-    cout << "Tempo total de execução: " << elapsed_time.count() << " segundos" << endl;
+    long long totalcells = static_cast<long long>(nx) * ny * nz * nsteps;
+    double mlups = static_cast<double>(totalcells) / (elapsed_time.count() * 1e6);
+
+    cout << "\n// =============================================== //\n";
+    cout << "     Tempo total de execução: " << elapsed_time.count() << " segundos\n";
+    cout << "     Desempenho: " << mlups << " MLUPS\n";
+    cout << "// =============================================== //\n" << endl;
 
     return 0;
 }

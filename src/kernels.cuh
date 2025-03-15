@@ -40,6 +40,19 @@ __global__ void gradCalc(
     float * __restrict__ normx,
     float * __restrict__ normy,
     float * __restrict__ normz,
+    float * __restrict__ indicator,
+    int nx, int ny, int nz
+);
+
+__global__ void curvatureCalc(
+    float * __restrict__ curvature,
+    const float * __restrict__ indicator,
+    const float * __restrict__ normx,
+    const float * __restrict__ normy,
+    const float * __restrict__ normz,
+    float * __restrict__ ffx,
+    float * __restrict__ ffy,
+    float * __restrict__ ffz,
     int nx, int ny, int nz
 );
 
@@ -48,6 +61,9 @@ __global__ void momentiCalc(
     float * __restrict__ uy,
     float * __restrict__ uz,
     float * __restrict__ rho,
+    float * __restrict__ ffx,
+    float * __restrict__ ffy,
+    float * __restrict__ ffz,
     const float * __restrict__ f,
     float * __restrict__ pxx,
     float * __restrict__ pyy,
@@ -63,6 +79,9 @@ __global__ void collisionFluid(
     const float * __restrict__ ux,
     const float * __restrict__ uy,
     const float * __restrict__ uz,
+    const float * __restrict__ ffx,
+    const float * __restrict__ ffy,
+    const float * __restrict__ ffz,
     const float * __restrict__ rho,
     const float * __restrict__ pxx,
     const float * __restrict__ pyy,
@@ -90,12 +109,15 @@ __global__ void fgBoundary(
     float * __restrict__ phi,
     float * __restrict__ ux,
     float * __restrict__ uy,
-    float * __restrict__ uz,   
+    float * __restrict__ uz,
     float * __restrict__ f,
     float * __restrict__ g,
     const float * __restrict__ normx,
     const float * __restrict__ normy,
     const float * __restrict__ normz,
+    const float * __restrict__ ffx,
+    const float * __restrict__ ffy,
+    const float * __restrict__ ffz,
     float u_max, int d_half,
     int nx, int ny, int nz,
     int step, int MACRO_SAVE

@@ -34,16 +34,19 @@ __global__ void initPhase(
 
     if (i >= nx || j >= ny || k >= nz) return;
 
-    int inlet_pos_x = nx / 2.0;
-    int inlet_pos_y = ny / 2.0;
-    int inlet_size = d_half;
+    int idx3D = inline3D(i, j, k, nx, ny);
 
-    if (k == 0 && 
-        (i >= inlet_pos_x - inlet_size && i <= inlet_pos_x + inlet_size) &&
-        (j >= inlet_pos_y - inlet_size && j <= inlet_pos_y + inlet_size))     
-    {
-        int idx = inline3D(i,j,k,nx,ny);
-        phi[idx] = 1.0;
+    float center_x = nx * 0.5f;
+    float center_y = ny * 0.5f;
+
+    float dx = i - center_x;
+    float dy = j - center_y;
+    float Ri = sqrt(dx * dx + dy * dy);
+
+    float phi_val = 0.5f + 0.5f * tanh(2.0f * (d_half*2.0f - Ri) / 3.0f);
+
+    if (k == 0) { 
+        phi[idx3D] = phi_val;
     }
 }
 
