@@ -2,16 +2,16 @@ from dataSave import *
 from fileTreat import *
 import math
 import sys
+import os
 
-if len(sys.argv) < 2:
-    print("Uso: python3 exampleVTK.py <ID>")
+if len(sys.argv) < 3:
+    print("Uso: python3 exampleVTK.py <ID> <velocity_set>")
     sys.exit(1)
 
 simulation_id = sys.argv[1]
-fluid_model = sys.argv[2]
-phase_model = sys.argv[3]
+velocity_set = sys.argv[2]
 
-path = f"./../bin/{fluid_model}_{phase_model}/{simulation_id}/"
+path = f"./../bin/{velocity_set}/{simulation_id}/"
 
 if not os.path.exists(path):
     print(f"Erro: O caminho {path} não existe.")
@@ -20,9 +20,7 @@ if not os.path.exists(path):
 macrSteps = getMacrSteps(path)
 info = getSimInfo(path)
 
-# for all steps saved
 for step in macrSteps:
-    macr = getMacrsFromStep(step,path)
-    # Save macroscopics to VTK format
+    macr = getMacrsFromStep(step, path)
     print("Processando passo", step)
     saveVTK3D(macr, path, info['ID'] + "macr" + str(step).zfill(6), points=True)

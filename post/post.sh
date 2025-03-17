@@ -1,13 +1,12 @@
 #!/bin/bash
 
-if [ "$#" -lt 3 ]; then
-    echo "Uso: ./post.sh <ID> <fluid_model> <phase_model>"
+if [ "$#" -lt 2 ]; then
+    echo "Uso: ./post.sh <ID> <velocity_set>"
     exit 1
 fi
 
 ID=$1   
-FLUID_MODEL=$2
-PHASE_MODEL=$3
+VELOCITY_SET=$2
 
 if [[ "$OSTYPE" == "linux-gnu"* ]]; then
     PYTHON_CMD="python3"
@@ -18,4 +17,4 @@ else
     PYTHON_CMD="python"
 fi
 
-$PYTHON_CMD exampleVTK.py "$ID" "$FLUID_MODEL" "$PHASE_MODEL"
+$PYTHON_CMD exampleVTK.py "$ID" "$VELOCITY_SET"

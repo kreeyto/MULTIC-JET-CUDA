@@ -3,21 +3,6 @@ from fileTreat import *
 
 
 def saveVTK3D(macrsDict, path, filenameWrite, points=True, normVal=1):
-    """ Saves variables values to VTK format
-
-    Parameters
-    ----------
-    macrsDict : dict()
-        Dict with variable values and name as key
-    filenameWrite : str
-        Filename to write to (NO EXTENSION)
-    points : bool, optional
-        If True, save as point centered data, if False,
-        save as cell centered data, by default True
-    normVal : int, optional
-        Value to normalize distance (if zero, the distance is
-        normalized by NX), by default 0
-    """
 
     info = getSimInfo(path)
 

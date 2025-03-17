@@ -15,31 +15,12 @@ __info__ = dict()
 
 
 def getFilenamesMacr(macrName,path):
-    """ Get all macroscopics filenames from the folder
-
-    Parameters
-    ----------
-    macrName : str
-        Macroscopic name (__macr_name__)
-
-    Returns
-    -------
-    list()
-        List of macroscopics filenames
-    """
 
     listFiles = sorted(glob.glob(path + "*" + macrName + "*.bin"))
     return listFiles
 
 
 def getMacrSteps(path):
-    """ Get all macroscopics steps from the folder
-
-    Returns
-    -------
-    list()
-        Sorted list of steps values
-    """
 
     listFiles = getFilenamesMacr(__macr_names__[0],path)
     setMacrSteps = set()

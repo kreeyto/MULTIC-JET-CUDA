@@ -1,20 +1,19 @@
 #include "var.cuh"
 
-int mesh = 64;
-int diam = 10; 
+int MESH = 64;
+int DIAM = 8; // will be integer if MESH = 2^x
 
 // extern vars
-int nx = mesh; int ny = mesh; int nz = mesh*4;  
-int d_half = diam/2;
-float u_max = 0.03; 
+int NX = MESH; int NY = MESH; int NZ = MESH*4;  
+int D_HALF = round(DIAM / 2);
+float U_MAX = 0.1f; 
 
-__constant__ float TAU;
 __constant__ float CSSQ;
 __constant__ float OMEGA;
 __constant__ float SHARP_C;
 __constant__ float SIGMA;
-__constant__ float W[FPOINTS], W_G[GPOINTS];
-__constant__ int CIX[FPOINTS], CIY[FPOINTS], CIZ[FPOINTS];
+__constant__ float W[NLINKS];
+__constant__ int CIX[NLINKS], CIY[NLINKS], CIZ[NLINKS];
 __constant__ float DATAZ[200];
 
 float *d_f, *d_g;
@@ -26,39 +25,38 @@ float *d_pxy, *d_pxz, *d_pyz, *d_rho, *d_phi;
 // ========================================================================== parametros ========================================================================== //
 
 // ========== adimensional parameters ========== //
-        //const float REYNOLDS = 5000;
-        const float WEBER = 1000;
+        //const int REYNOLDS = 5000;
+        const int WEBER = 1000;
 // ============================================= //
 
-//const float visc = u_max + (diam+diam) / REYNOLDS;
-//const float h_tau = 0.5 + 3.0 * visc;
-const float h_tau = 0.505;
-const float h_cssq = 1.0 / 3.0;
-const float h_omega = 1.0 / h_tau;
-const float h_sharp_c = 0.15 * 3.0;
-//const float h_sigma = 0.1;
-const float h_sigma = u_max * u_max * (diam+diam) / WEBER;
+//const float VISC = U_MAX + (DIAM+DIAM) / REYNOLDS;
+//const float H_TAU = 0.5f + 3.0f * VISC;
+const float H_TAU = 0.505f;
+const float H_CSSQ = 1.0f / 3.0f;
+const float H_OMEGA = 1.0f / H_TAU;
+const float H_SHARP_C = 0.15f * 3.0f;
+const float H_SIGMA = U_MAX * U_MAX * (DIAM+DIAM) / WEBER;
 
-// fluid velocity set
-#ifdef FD3Q19
-    int h_cix[19] = { 0, 1, -1, 0, 0, 0, 0, 1, -1, 1, -1, 0, 0, 1, -1, 1, -1, 0, 0 };
-    int h_ciy[19] = { 0, 0, 0, 1, -1, 0, 0, 1, -1, 0, 0, 1, -1, -1, 1, 0, 0, 1, -1 };
-    int h_ciz[19] = { 0, 0, 0, 0, 0, 1, -1, 0, 0, 1, -1, 1, -1, 0, 0, -1, 1, -1, 1 };
-#elif defined(FD3Q27)
-    int h_cix[27] = { 0, 1, -1, 0, 0, 0, 0, 1, -1, 1, -1, 0, 0, 1, -1, 1, -1, 0, 0, 1, -1, 1, -1, 1, -1, -1, 1 };
-    int h_ciy[27] = { 0, 0, 0, 1, -1, 0, 0, 1, -1, 0, 0, 1, -1, -1, 1, 0, 0, 1, -1, 1, -1, 1, -1, -1, 1, 1, -1 };
-    int h_ciz[27] = { 0, 0, 0, 0, 0, 1, -1, 0, 0, 1, -1, 1, -1, 0, 0, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1, -1 };
+// velocity set
+#ifdef D3Q19
+    int H_CIX[19] = { 0, 1, -1, 0, 0, 0, 0, 1, -1, 1, -1, 0, 0, 1, -1, 1, -1, 0, 0 };
+    int H_CIY[19] = { 0, 0, 0, 1, -1, 0, 0, 1, -1, 0, 0, 1, -1, -1, 1, 0, 0, 1, -1 };
+    int H_CIZ[19] = { 0, 0, 0, 0, 0, 1, -1, 0, 0, 1, -1, 1, -1, 0, 0, -1, 1, -1, 1 };
+#elif defined(D3Q27)
+    int H_CIX[27] = { 0, 1, -1, 0, 0, 0, 0, 1, -1, 1, -1, 0, 0, 1, -1, 1, -1, 0, 0, 1, -1, 1, -1, 1, -1, -1, 1 };
+    int H_CIY[27] = { 0, 0, 0, 1, -1, 0, 0, 1, -1, 0, 0, 1, -1, -1, 1, 0, 0, 1, -1, 1, -1, 1, -1, -1, 1, 1, -1 };
+    int H_CIZ[27] = { 0, 0, 0, 0, 0, 1, -1, 0, 0, 1, -1, 1, -1, 0, 0, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1, -1 };
 #endif
 
-// fluid weights
-#ifdef FD3Q19
-    float h_w[19] = {
+// vs weights
+#ifdef D3Q19
+    float H_W[19] = {
         1.0 / 3.0, 
         1.0 / 18.0, 1.0 / 18.0, 1.0 / 18.0, 1.0 / 18.0, 1.0 / 18.0, 1.0 / 18.0,
         1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0
     };
-#elif defined(FD3Q27)
-    float h_w[27] = {
+#elif defined(D3Q27)
+    float H_W[27] = {
         8.0 / 27.0,
         2.0 / 27.0, 2.0 / 27.0, 2.0 / 27.0, 2.0 / 27.0, 2.0 / 27.0, 2.0 / 27.0, 
         1.0 / 54.0, 1.0 / 54.0, 1.0 / 54.0, 1.0 / 54.0, 1.0 / 54.0, 1.0 / 54.0, 1.0 / 54.0, 1.0 / 54.0, 1.0 / 54.0, 1.0 / 54.0, 1.0 / 54.0, 1.0 / 54.0, 
@@ -66,17 +64,8 @@ const float h_sigma = u_max * u_max * (diam+diam) / WEBER;
     };
 #endif
 
-// phase field weights
-#ifdef PD3Q19
-    float h_w_g[19] = {
-        1.0 / 3.0, 
-        1.0 / 18.0, 1.0 / 18.0, 1.0 / 18.0, 1.0 / 18.0, 1.0 / 18.0, 1.0 / 18.0,
-        1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0, 1.0 / 36.0
-    };
-#endif
-
 // perturbation
-float h_dataz[200] = { 0.00079383, 0.00081679, 0.00002621, -0.00002419, -0.00044200, -0.00084266, 0.00048380, 0.00021733, 0.00032251, 0.00001137, 
+float H_DATAZ[200] = { 0.00079383, 0.00081679, 0.00002621, -0.00002419, -0.00044200, -0.00084266, 0.00048380, 0.00021733, 0.00032251, 0.00001137, 
                       -0.00050303, -0.00008389, 0.00000994, -0.00061235, 0.00092132, 0.00001801, 0.00064784, -0.00013657, 0.00051558, 0.00020564, 
                       -0.00074830, -0.00094143, -0.00052143, 0.00073746, 0.00024430, 0.00036541, -0.00014634, -0.00034321, 0.00013730, 0.00005668, 
                        0.00034116, -0.00098297, 0.00007028, 0.00042728, -0.00086542, -0.00059119, 0.00059534, 0.00026490, -0.00007748, -0.00054852, 
@@ -99,64 +88,62 @@ float h_dataz[200] = { 0.00079383, 0.00081679, 0.00002621, -0.00002419, -0.00044
 // =============================================================================================================================================================== //
 
 void initializeVars() {
-    size_t size = nx * ny * nz * sizeof(float);            
-    size_t f_size = nx * ny * nz * FPOINTS * sizeof(float); 
-    size_t g_size = nx * ny * nz * GPOINTS * sizeof(float); 
+    size_t SIZE = NX * NY * NZ * sizeof(float);            
+    size_t F_SIZE = NX * NY * NZ * NLINKS * sizeof(float); 
+    size_t G_SIZE = NX * NY * NZ * NLINKS * sizeof(float); 
 
-    cudaMalloc((void **)&d_rho, size);
-    cudaMalloc((void **)&d_phi, size);
-    cudaMalloc((void **)&d_ux, size);
-    cudaMalloc((void **)&d_uy, size);
-    cudaMalloc((void **)&d_uz, size);
-    cudaMalloc((void **)&d_normx, size);
-    cudaMalloc((void **)&d_normy, size);
-    cudaMalloc((void **)&d_normz, size);
-    cudaMalloc((void **)&d_curvature, size);
-    cudaMalloc((void **)&d_indicator, size);
-    cudaMalloc((void **)&d_ffx, size);
-    cudaMalloc((void **)&d_ffy, size);
-    cudaMalloc((void **)&d_ffz, size);
-    cudaMalloc((void **)&d_pxx, size);
-    cudaMalloc((void **)&d_pyy, size);
-    cudaMalloc((void **)&d_pzz, size);
-    cudaMalloc((void **)&d_pxy, size);
-    cudaMalloc((void **)&d_pxz, size);
-    cudaMalloc((void **)&d_pyz, size);
+    cudaMalloc((void **)&d_rho, SIZE);
+    cudaMalloc((void **)&d_phi, SIZE);
+    cudaMalloc((void **)&d_ux, SIZE);
+    cudaMalloc((void **)&d_uy, SIZE);
+    cudaMalloc((void **)&d_uz, SIZE);
+    cudaMalloc((void **)&d_normx, SIZE);
+    cudaMalloc((void **)&d_normy, SIZE);
+    cudaMalloc((void **)&d_normz, SIZE);
+    cudaMalloc((void **)&d_curvature, SIZE);
+    cudaMalloc((void **)&d_indicator, SIZE);
+    cudaMalloc((void **)&d_ffx, SIZE);
+    cudaMalloc((void **)&d_ffy, SIZE);
+    cudaMalloc((void **)&d_ffz, SIZE);
+    cudaMalloc((void **)&d_pxx, SIZE);
+    cudaMalloc((void **)&d_pyy, SIZE);
+    cudaMalloc((void **)&d_pzz, SIZE);
+    cudaMalloc((void **)&d_pxy, SIZE);
+    cudaMalloc((void **)&d_pxz, SIZE);
+    cudaMalloc((void **)&d_pyz, SIZE);
 
-    cudaMalloc((void **)&d_f, f_size);
-    cudaMalloc((void **)&d_g, g_size);
+    cudaMalloc((void **)&d_f, F_SIZE);
+    cudaMalloc((void **)&d_g, G_SIZE);
 
-    cudaMemset(d_phi, 0, size);
-    cudaMemset(d_ux, 0, size);
-    cudaMemset(d_uy, 0, size);
-    cudaMemset(d_uz, 0, size);
+    cudaMemset(d_phi, 0, SIZE);
+    cudaMemset(d_ux, 0, SIZE);
+    cudaMemset(d_uy, 0, SIZE);
+    cudaMemset(d_uz, 0, SIZE);
     
-    cudaMemset(d_f, 0, f_size);
-    cudaMemset(d_g, 0, g_size);
+    cudaMemset(d_f, 0, F_SIZE);
+    cudaMemset(d_g, 0, G_SIZE);
 
-    cudaMemset(d_normx, 0, size);
-    cudaMemset(d_normy, 0, size);
-    cudaMemset(d_normz, 0, size);
-    cudaMemset(d_curvature, 0, size);
-    cudaMemset(d_indicator, 0, size);
-    cudaMemset(d_ffx, 0, size);
-    cudaMemset(d_ffy, 0, size);
-    cudaMemset(d_ffz, 0, size);
+    cudaMemset(d_normx, 0, SIZE);
+    cudaMemset(d_normy, 0, SIZE);
+    cudaMemset(d_normz, 0, SIZE);
+    cudaMemset(d_curvature, 0, SIZE);
+    cudaMemset(d_indicator, 0, SIZE);
+    cudaMemset(d_ffx, 0, SIZE);
+    cudaMemset(d_ffy, 0, SIZE);
+    cudaMemset(d_ffz, 0, SIZE);
 
-    cudaMemcpyToSymbol(TAU, &h_tau, sizeof(float));
-    cudaMemcpyToSymbol(CSSQ, &h_cssq, sizeof(float));
-    cudaMemcpyToSymbol(OMEGA, &h_omega, sizeof(float));
-    cudaMemcpyToSymbol(SHARP_C, &h_sharp_c, sizeof(float));
-    cudaMemcpyToSymbol(SIGMA, &h_sigma, sizeof(float));
+    cudaMemcpyToSymbol(CSSQ, &H_CSSQ, sizeof(float));
+    cudaMemcpyToSymbol(OMEGA, &H_OMEGA, sizeof(float));
+    cudaMemcpyToSymbol(SHARP_C, &H_SHARP_C, sizeof(float));
+    cudaMemcpyToSymbol(SIGMA, &H_SIGMA, sizeof(float));
 
-    cudaMemcpyToSymbol(W, &h_w, FPOINTS * sizeof(float));
-    cudaMemcpyToSymbol(W_G, &h_w_g, GPOINTS * sizeof(float));
+    cudaMemcpyToSymbol(W, &H_W, NLINKS * sizeof(float));
 
-    cudaMemcpyToSymbol(CIX, &h_cix, FPOINTS * sizeof(int));
-    cudaMemcpyToSymbol(CIY, &h_ciy, FPOINTS * sizeof(int));
-    cudaMemcpyToSymbol(CIZ, &h_ciz, FPOINTS * sizeof(int));
+    cudaMemcpyToSymbol(CIX, &H_CIX, NLINKS * sizeof(int));
+    cudaMemcpyToSymbol(CIY, &H_CIY, NLINKS * sizeof(int));
+    cudaMemcpyToSymbol(CIZ, &H_CIZ, NLINKS * sizeof(int));
 
-    cudaMemcpyToSymbol(DATAZ, &h_dataz, 200 * sizeof(float));
+    cudaMemcpyToSymbol(DATAZ, &H_DATAZ, 200 * sizeof(float));
 
 }
 

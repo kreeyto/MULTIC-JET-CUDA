@@ -2,13 +2,13 @@
 
 #include "header.cuh"
 
-extern int nx, ny, nz;
-extern int d_half;
-extern float u_max;
+extern int NX, NY, NZ;
+extern int D_HALF;
+extern float U_MAX;
 
-extern __constant__ float TAU, CSSQ, OMEGA, SHARP_C, SIGMA;
-extern __constant__ float W[FPOINTS], W_G[GPOINTS];
-extern __constant__ int CIX[FPOINTS], CIY[FPOINTS], CIZ[FPOINTS];
+extern __constant__ float CSSQ, OMEGA, SHARP_C, SIGMA;
+extern __constant__ float W[NLINKS];
+extern __constant__ int CIX[NLINKS], CIY[NLINKS], CIZ[NLINKS];
 extern __constant__ float DATAZ[200];
  
 extern float *d_f, *d_g;

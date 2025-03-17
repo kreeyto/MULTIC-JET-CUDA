@@ -3,47 +3,47 @@
 #include "var.cuh"
 
 int main(int argc, char* argv[]) {
-    auto start_time = chrono::high_resolution_clock::now();
-    if (argc < 4) {
-        cerr << "Erro: Uso: " << argv[0] << " F<fluid velocity set> P<phase field velocity set> <id>" << endl;
+    auto START_TIME = chrono::high_resolution_clock::now();
+    if (argc < 3) {
+        cerr << "Erro: Uso: " << argv[0] << " <velocity set> <ID>" << endl;
         return 1;
     }
-    string fluid_model = argv[1];
-    string phase_model = argv[2];
-    string id = argv[3];
+    string VELOCITY_SET = argv[1];
+    string ID = argv[2];
 
-    string base_dir;   
+    string BASE_DIR;   
     #ifdef _WIN32
-        base_dir = "..\\";
+        BASE_DIR = "..\\";
     #else
-        base_dir = "../";
+        BASE_DIR = "../";
     #endif
-    string model_dir = base_dir + "bin/" + fluid_model + "_" + phase_model + "/";
-    string sim_dir = model_dir + id + "/";
+    string MODEL_DIR = BASE_DIR + "bin/" + VELOCITY_SET + "/";
+    string SIM_DIR = MODEL_DIR + ID + "/";
+    
     #ifdef _WIN32
-        string mkdir_command = "mkdir \"" + sim_dir + "\"";
+        string MKDIR_COMMAND = "mkdir \"" + SIM_DIR + "\"";
     #else
-        string mkdir_command = "mkdir -p \"" + sim_dir + "\"";
+        string MKDIR_COMMAND = "mkdir -p \"" + SIM_DIR + "\"";
     #endif
-    int ret = system(mkdir_command.c_str());
+    
+    int ret = system(MKDIR_COMMAND.c_str());
     (void)ret;
 
     // ============================================================================================================================================================= //
 
     // ========================= //
-    int stamp = 100, nsteps = 25000;
+    int STAMP = 100, NSTEPS = 25000;
     // ========================= //
     initializeVars();
 
-    string info_file = sim_dir + id + "_info.txt";
-    float h_tau;
-    cudaMemcpyFromSymbol(&h_tau, TAU, sizeof(float), 0, cudaMemcpyDeviceToHost);
-    generateSimulationInfoFile(info_file, nx, ny, nz, stamp, nsteps, h_tau, id, fluid_model);
+    string INFO_FILE = SIM_DIR + ID + "_info.txt";
+    float H_TAU = 0.505f;
+    generateSimulationInfoFile(INFO_FILE, NX, NY, NZ, STAMP, NSTEPS, H_TAU, ID, VELOCITY_SET);
 
     dim3 threadsPerBlock(8,8,8);
-    dim3 numBlocks((nx + threadsPerBlock.x - 1) / threadsPerBlock.x,
-                   (ny + threadsPerBlock.y - 1) / threadsPerBlock.y,
-                   (nz + threadsPerBlock.z - 1) / threadsPerBlock.z);
+    dim3 numBlocks((NX + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                   (NY + threadsPerBlock.y - 1) / threadsPerBlock.y,
+                   (NZ + threadsPerBlock.z - 1) / threadsPerBlock.z);
 
     // STREAMS
     cudaStream_t mainStream, collFluid, collPhase;
@@ -56,28 +56,28 @@ int main(int argc, char* argv[]) {
         initTensor<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
             d_pxx, d_pyy, d_pzz, 
             d_pxy, d_pxz, d_pyz,
-            d_rho, nx, ny, nz
+            d_rho, NX, NY, NZ
         );
 
         initPhase<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
-            d_phi, d_half, nx, ny, nz
+            d_phi, D_HALF, NX, NY, NZ
         ); 
 
         initDist<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
-            d_rho, d_phi, d_f, d_g, nx, ny, nz
+            d_rho, d_phi, d_f, d_g, NX, NY, NZ
         ); 
 
     // ========================================= //
 
-    vector<float> phi_host(nx * ny * nz);
+    vector<float> phi_host(NX * NY * NZ);
 
-    for (int t = 0; t <= nsteps ; ++t) {
-        cout << "Passo " << t << " de " << nsteps << " iniciado..." << endl;
+    for (int STEP = 0; STEP <= NSTEPS ; ++STEP) {
+        cout << "Passo " << STEP << " de " << NSTEPS << " iniciado..." << endl;
 
         // ================= PHASE FIELD ================= //
 
             phiCalc<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
-                d_phi, d_g, nx, ny, nz
+                d_phi, d_g, NX, NY, NZ
             ); 
 
         // =============================================== // 
@@ -87,9 +87,8 @@ int main(int argc, char* argv[]) {
         // ===================== NORMALS ===================== //
 
             gradCalc<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
-                d_phi, d_normx, d_normy, d_normz, 
-                d_indicator, 
-                nx, ny, nz
+                d_phi, d_normx, d_normy, d_normz, d_indicator, 
+                NX, NY, NZ
             ); 
 
         // =================================================== // 
@@ -102,7 +101,7 @@ int main(int argc, char* argv[]) {
                 d_curvature, d_indicator,
                 d_normx, d_normy, d_normz, 
                 d_ffx, d_ffy, d_ffz,
-                nx, ny, nz
+                NX, NY, NZ
             ); 
 
         // =================================================== //   
@@ -116,7 +115,7 @@ int main(int argc, char* argv[]) {
                 d_ffx, d_ffy, d_ffz, d_f,
                 d_pxx, d_pyy, d_pzz,
                 d_pxy, d_pxz, d_pyz,
-                nx, ny, nz
+                NX, NY, NZ
             ); 
 
         // ================================================== //   
@@ -129,13 +128,13 @@ int main(int argc, char* argv[]) {
                 d_f, d_ux, d_uy, d_uz, 
                 d_ffx, d_ffy, d_ffz, d_rho,
                 d_pxx, d_pyy, d_pzz, d_pxy, d_pxz, d_pyz, 
-                nx, ny, nz
+                NX, NY, NZ
             ); 
 
             collisionPhase<<<numBlocks, threadsPerBlock, 0, collPhase>>> (
                 d_g, d_ux, d_uy, d_uz, 
                 d_phi, d_normx, d_normy, d_normz, 
-                nx, ny, nz
+                NX, NY, NZ
             ); 
 
             cudaStreamSynchronize(collFluid);
@@ -151,24 +150,26 @@ int main(int argc, char* argv[]) {
                 d_ux, d_uy, d_uz, d_f, d_g, 
                 d_normx, d_normy, d_normz,
                 d_ffx, d_ffy, d_ffz,
-                u_max, d_half,
-                nx, ny, nz,
-                t, stamp
+                U_MAX, D_HALF,
+                NX, NY, NZ,
+                STEP, STAMP
             ); 
 
         // ================================================================================================= //
 
         cudaDeviceSynchronize();
 
-        if (t % stamp == 0) {
+        if (STEP % STAMP == 0) {
 
-            copyAndSaveToBinary(d_phi, nx * ny * nz, sim_dir, id, t, "phi");
+            copyAndSaveToBinary(d_phi, NX * NY * NZ, SIM_DIR, ID, STEP, "phi");
 
-            cout << "Passo " << t << ": Dados salvos em " << sim_dir << endl;
+            cout << "Passo " << STEP << ": Dados salvos em " << SIM_DIR << endl;
         }
     }
 
     cudaStreamDestroy(mainStream);
+    cudaStreamDestroy(collFluid);
+    cudaStreamDestroy(collPhase);
 
     float *pointers[] = {d_f, d_g, d_phi, d_rho, 
                           d_normx, d_normy, d_normz, d_indicator,
@@ -177,14 +178,14 @@ int main(int argc, char* argv[]) {
                         };
     freeMemory(pointers, 21);  
 
-    auto end_time = chrono::high_resolution_clock::now();
-    chrono::duration<double> elapsed_time = end_time - start_time;
-    long long totalcells = static_cast<long long>(nx) * ny * nz * nsteps;
-    double mlups = static_cast<double>(totalcells) / (elapsed_time.count() * 1e6);
+    auto END_TIME = chrono::high_resolution_clock::now();
+    chrono::duration<double> ELAPSED_TIME = END_TIME - START_TIME;
+    long long TOTAL_CELLS = static_cast<long long>(NX) * NY * NZ * NSTEPS;
+    double MLUPS = static_cast<double>(TOTAL_CELLS) / (ELAPSED_TIME.count() * 1e6);
 
     cout << "\n// =============================================== //\n";
-    cout << "     Tempo total de execução: " << elapsed_time.count() << " segundos\n";
-    cout << "     Desempenho: " << mlups << " MLUPS\n";
+    cout << "     Tempo total de execução: " << ELAPSED_TIME.count() << " segundos\n";
+    cout << "     Desempenho: " << MLUPS << " MLUPS\n";
     cout << "// =============================================== //\n" << endl;
 
     return 0;

@@ -3,16 +3,16 @@
 
 #include "header.cuh"
 
-void freeMemory(float **pointers, int count);
+void freeMemory(float **pointers, int COUNT);
 
 void generateSimulationInfoFile(
-    const string& filepath, int nx, int ny, int nz, int stamp, int nsteps, float tau, 
-    const string& sim_id, const string& fluid_model
+    const string& FILEPATH, int NX, int NY, int NZ, int STAMP, int NSTEPS, float TAU, 
+    const string& SIM_ID, const string& VELOCITY_SET
 );
 
 void copyAndSaveToBinary(
-    const float* d_data, size_t size, const string& sim_dir, 
-    const string& id, int t, const string& var_name
+    const float* d_data, size_t SIZE, const string& SIM_DIR, 
+    const string& ID, int STEP, const string& VAR_NAME
 );
 
 #endif
