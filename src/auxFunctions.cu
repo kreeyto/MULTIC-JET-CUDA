@@ -10,7 +10,7 @@ void freeMemory(float **pointers, int COUNT) {
 }
 
 void generateSimulationInfoFile(
-    const string& FILEPATH, const int NX, const int NY, const int NZ, const int STAMP, const int NSTEPS, const float TAU, 
+    const string& FILEPATH, const int NX, const int NY, const int NZ, const int MACRO_SAVE, const int NSTEPS, const float TAU, 
     const string& SIM_ID, const string& VELOCITY_SET
 ) {
     try {
@@ -34,7 +34,7 @@ void generateSimulationInfoFile(
              << "                           FX: 0.000000e+00\n"
              << "                           FY: 0.000000e+00\n"
              << "                           FZ: 0.000000e+00\n"
-             << "                           Save steps: " << STAMP << '\n'
+             << "                           Save steps: " << MACRO_SAVE << '\n'
              << "                           Nsteps: " << NSTEPS << '\n'
              << "                           MLUPS: 1.187970e+01\n"
              << "--------------------------------------------------------------------------------\n";

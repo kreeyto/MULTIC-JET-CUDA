@@ -277,8 +277,8 @@ __global__ void collisionFluid(
         float udotc = (ux_val * CIX[l] + uy_val * CIY[l] + uz_val * CIZ[l]) * invCssq;
         float feq = W[l] * (rho_val + rho_val * (udotc + 0.5f * udotc*udotc - uu));
         float HeF = auxHe * feq * ( (CIX[l] - ux_val) * ffx_val +
-                                     (CIY[l] - uy_val) * ffy_val +
-                                     (CIZ[l] - uz_val) * ffz_val ) * invRhoCssq;
+                                    (CIY[l] - uy_val) * ffy_val +
+                                    (CIZ[l] - uz_val) * ffz_val ) * invRhoCssq;
         float fneq = (W[l] / (2.0f * CSSQ * CSSQ)) * ((CIX[l]*CIX[l] - CSSQ) * pxx_val +
                                                       (CIY[l]*CIY[l] - CSSQ) * pyy_val +
                                                       (CIZ[l]*CIZ[l] - CSSQ) * pzz_val +
@@ -331,7 +331,7 @@ __global__ void collisionPhase(
         float geq = W[l] * phi_val * (1.0f + udotc);
         float Ai = W[l] * phi_norm * (CIX[l] * normx_val + CIY[l] * normy_val + CIZ[l] * normz_val);
         int offset = inline4D(ii,jj,kk,l,NX,NY,NZ);
-        g[offset] = geq + Ai; // + (1 - omega) * gneq;
+        g[offset] = geq + Ai;
     }
 }
 

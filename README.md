@@ -1,6 +1,6 @@
-# Bubble-GPU
+# MULTIC-JET-CUDA
 
-Bubble-GPU é um projeto para simulações de fluidos usando o método Lattice Boltzmann (LBM), implementado com suporte para GPUs, permitindo a execução eficiente de simulações computacionalmente intensivas. O foco atual está na simulação de bolhas estacionárias e oscilantes em 3D utilizando os modelos D3Q19 e D3Q27.
+MULTIC-JET-CUDA é um projeto para simulações de jatos multicomponentes usando o método Lattice Boltzmann (LBM), implementado com suporte para GPUs, permitindo a execução eficiente de simulações computacionalmente intensivas. O projeto tem suporte D3Q19 para ambos os componentes.
 
 ## Estrutura do Projeto
 
@@ -16,22 +16,21 @@ Bubble-GPU é um projeto para simulações de fluidos usando o método Lattice B
    Use o script `pipeline.sh` para compilar e executar o simulador:
 
    ```bash
-   ./pipeline.sh <fluid_model> <phase_model> <id>
+   ./pipeline.sh <velocity_set> <id>
    ```
 
-   - **`<fluid_model>`**: Modelo de fluido (exemplo: `FD3Q19`).
-   - **`<phase_model>`**: Modelo de fase (exemplo: `PD3Q15`).
+   - **`<velocity_set>`**: *Velocity set* relacionado aos componentes.
    - **`<id>`**: Identificador único para a simulação (exemplo: `000`).
 
    Exemplo:
 
    ```bash
-   ./pipeline.sh FD3Q19 PD3Q15 001
+   ./pipeline.sh D3Q19 000
    ```
 
 2. **Resultados**:
    - Saídas de simulação serão salvas em:
-     - `bin/<fluid_model>_<phase_model>/<id>/`
+     - `bin/<velocity_set>/<id>/`
 
 3. **Pós-Processamento**:
    O script também executará automaticamente o pós-processamento.
@@ -40,7 +39,7 @@ Bubble-GPU é um projeto para simulações de fluidos usando o método Lattice B
 
 - **Executar uma simulação**:
   ```bash
-  ./pipeline.sh FD3Q19 PD3Q15 001
+  ./pipeline.sh D3Q19 000
   ```
 
 

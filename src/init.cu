@@ -71,11 +71,13 @@ __global__ void initDist(
     float rho_val = rho[idx3D];
     float phi_val = phi[idx3D];
 
+    #pragma unroll 19
     for (int l = 0; l < NLINKS; ++l) {
         int idx4D = inline4D(i,j,k,l,NX,NY,NZ);
         f[idx4D] = W[l] * rho_val;
     }
-
+    
+    #pragma unroll 19
     for (int l = 0; l < NLINKS; ++l) {
         int idx4D = inline4D(i,j,k,l,NX,NY,NZ);
         g[idx4D] = W[l] * phi_val;

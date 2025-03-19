@@ -31,14 +31,14 @@ int main(int argc, char* argv[]) {
 
     // ============================================================================================================================================================= //
 
-    // ========================= //
-    int STAMP = 100, NSTEPS = 25000;
-    // ========================= //
+    // ================================= //
+    int MACRO_SAVE = 100, NSTEPS = 25000;
+    // ================================= //
     initializeVars();
 
     string INFO_FILE = SIM_DIR + ID + "_info.txt";
     float H_TAU = 0.505f;
-    generateSimulationInfoFile(INFO_FILE, NX, NY, NZ, STAMP, NSTEPS, H_TAU, ID, VELOCITY_SET);
+    generateSimulationInfoFile(INFO_FILE, NX, NY, NZ, MACRO_SAVE, NSTEPS, H_TAU, ID, VELOCITY_SET);
 
     dim3 threadsPerBlock(8,8,8);
     dim3 numBlocks((NX + threadsPerBlock.x - 1) / threadsPerBlock.x,
@@ -152,14 +152,14 @@ int main(int argc, char* argv[]) {
                 d_ffx, d_ffy, d_ffz,
                 U_MAX, D_HALF,
                 NX, NY, NZ,
-                STEP, STAMP
+                STEP, MACRO_SAVE
             ); 
 
         // ================================================================================================= //
 
         cudaDeviceSynchronize();
 
-        if (STEP % STAMP == 0) {
+        if (STEP % MACRO_SAVE == 0) {
 
             copyAndSaveToBinary(d_phi, NX * NY * NZ, SIM_DIR, ID, STEP, "phi");
 
