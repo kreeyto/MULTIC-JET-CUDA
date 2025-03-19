@@ -374,7 +374,7 @@ __global__ void fgBoundary(
     
     if (Ri > D_HALF*2.0f) return;
 
-    float u_in = U_MAX * (1.0f + DATAZ[STEP / MACRO_SAVE] * 10);
+    float u_in = U_MAX * (1.0f + DATAZ[STEP / MACRO_SAVE] * 100);
     float phi_in = 0.5f + 0.5f * tanh(2.0f * (D_HALF*2.0f - Ri) / 3.0f);
 
     int idx_in = inline3D(i,j,k,NX,NY);
