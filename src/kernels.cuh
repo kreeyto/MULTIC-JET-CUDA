@@ -16,8 +16,8 @@ __global__ void initTensor(
 
 __global__ void initPhase(
     float * __restrict__ phi, 
-    const int d_half, 
-    const int nx, const int ny, const int nz
+    const int DIAM, 
+    const int NX, const int NY, const int NZ
 );
 
 __global__ void initDist(

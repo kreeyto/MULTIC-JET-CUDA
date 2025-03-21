@@ -60,13 +60,13 @@ __global__ void gradCalc(
         grad_fiy += coef * CIY[l] * val;
         grad_fiz += coef * CIZ[l] * val;
     }
-
+    
     float gmag_sq = grad_fix * grad_fix + grad_fiy * grad_fiy + grad_fiz * grad_fiz;
     float factor = rsqrtf(fmaxf(gmag_sq, 1e-9));
 
     normx[idx3D] = grad_fix * factor;
     normy[idx3D] = grad_fiy * factor;
-    normz[idx3D] = grad_fiz * factor;
+    normz[idx3D] = grad_fiz * factor; 
     indicator[idx3D] = gmag_sq * factor;  
 }
 
@@ -355,7 +355,7 @@ __global__ void fgBoundary(
     const float * __restrict__ ffx,
     const float * __restrict__ ffy,
     const float * __restrict__ ffz,
-    const float U_MAX, const int D_HALF,
+    const float U_JET, const int DIAM,
     const int NX, const int NY, const int NZ,
     const int STEP, const int MACRO_SAVE
 ) {
@@ -372,11 +372,11 @@ __global__ void fgBoundary(
     float dy = j - cy;
     float Ri = sqrt(dx*dx + dy*dy);
     
-    if (Ri > D_HALF*2.0f) return;
+    if (Ri > DIAM) return;
 
-    float u_in = U_MAX * (1.0f + DATAZ[STEP / MACRO_SAVE] * 100);
-    float phi_in = 0.5f + 0.5f * tanh(2.0f * (D_HALF*2.0f - Ri) / 3.0f);
-
+    float u_in = U_JET * (1.0f + DATAZ[STEP / MACRO_SAVE] * 10);
+    float phi_in = 0.5f + 0.5f * tanh(2.0f * (DIAM - Ri) / 3.0f);
+    
     int idx_in = inline3D(i,j,k,NX,NY);
 
     float ffx_val = ffx[idx_in];
@@ -413,7 +413,7 @@ __global__ void fgBoundary(
         if (i_new >= 0 && i_new < NX &&
             j_new >= 0 && j_new < NY &&
             k_new >= 0 && k_new < NZ) {
-            int idx_f = inline4D(i_new, j_new, k_new, l, NX, NY, NZ);
+            int idx_f = inline4D(i_new,j_new,k_new,l,NX,NY,NZ);
             f[idx_f] = feq + HeF;
         }
     }
@@ -422,7 +422,7 @@ __global__ void fgBoundary(
     for (int l = 0; l < NLINKS; ++l) {
         float udotc = (uz_val * CIZ[l]) / CSSQ;
         float geq = W[l] * phi[idx_in] * (1.0f + udotc);
-        float Ai = W[l] * SHARP_C * phi[idx_in] * (1.0f - phi[idx_in]) *
+        float Hi = W[l] * SHARP_C * phi[idx_in] * (1.0f - phi[idx_in]) *
                     (CIX[l] * normx[idx_in] + CIY[l] * normy[idx_in] + CIZ[l] * normz[idx_in]);
 
         int i_new = i + CIX[l];
@@ -432,8 +432,8 @@ __global__ void fgBoundary(
         if (i_new >= 0 && i_new < NX &&
             j_new >= 0 && j_new < NY &&
             k_new >= 0 && k_new < NZ) {
-            int idx_g = inline4D(i_new, j_new, k_new, l, NX, NY, NZ);
-            g[idx_g] = geq + Ai;
+            int idx_g = inline4D(i_new,j_new,k_new,l,NX,NY,NZ);
+            g[idx_g] = geq + Hi;
         }
     }
 }

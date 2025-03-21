@@ -26,8 +26,7 @@ __global__ void initTensor(
 
 __global__ void initPhase(
     float * __restrict__ phi, 
-    const int D_HALF, 
-    const int NX, const int NY, const int NZ
+    const int DIAM, const int NX, const int NY, const int NZ
 ) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     int j = blockIdx.y * blockDim.y + threadIdx.y;
@@ -44,7 +43,7 @@ __global__ void initPhase(
     float dy = j - center_y;
     float Ri = sqrt(dx*dx + dy*dy);
 
-    float phi_val = 0.5f + 0.5f * tanh(2.0f * (D_HALF*2.0f - Ri) / 3.0f);
+    float phi_val = 0.5f + 0.5f * tanh(2.0f * (DIAM - Ri) / 3.0f);
 
     if (k == 0) { 
         phi[idx3D] = phi_val;

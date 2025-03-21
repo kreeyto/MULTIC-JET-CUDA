@@ -2,9 +2,9 @@
 
 #include "header.cuh"
 
+extern int DIAM;
 extern int NX, NY, NZ;
-extern int D_HALF;
-extern float U_MAX;
+extern float U_JET;
 
 extern __constant__ float CSSQ, OMEGA, SHARP_C, SIGMA;
 extern __constant__ float W[NLINKS];
