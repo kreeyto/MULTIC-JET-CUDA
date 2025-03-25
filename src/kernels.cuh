@@ -14,11 +14,13 @@ __global__ void initTensor(
     const int NX, const int NY, const int NZ
 );
 
+/*
 __global__ void initPhase(
     float * __restrict__ phi, 
     const int DIAM, 
     const int NX, const int NY, const int NZ
 );
+*/
 
 __global__ void initDist(
     const float * __restrict__ rho, 

@@ -15,7 +15,8 @@ __global__ void phiCalc(
 
     int idx3D = inline3D(i,j,k,NX,NY);
 
-    float sum = 0.0f;       
+    float sum = 0.0f;  
+    #pragma unroll 19     
     for (int l = 0; l < NLINKS; ++l) {
         int idx4D = inline4D(i,j,k,l,NX,NY,NZ);
         sum += g[idx4D];

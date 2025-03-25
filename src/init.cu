@@ -24,6 +24,7 @@ __global__ void initTensor(
     rho[idx3D] = val;
 }
 
+/*
 __global__ void initPhase(
     float * __restrict__ phi, 
     const int DIAM, const int NX, const int NY, const int NZ
@@ -49,6 +50,7 @@ __global__ void initPhase(
         phi[idx3D] = phi_val;
     }
 }
+*/
 
 // =================================================================================================== //
 

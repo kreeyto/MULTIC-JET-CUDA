@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
     // ============================================================================================================================================================= //
 
     // ================================= //
-    int MACRO_SAVE = 100, NSTEPS = 50000;
+    int MACRO_SAVE = 100, NSTEPS = 25000;
     // ================================= //
     initializeVars();
 
@@ -59,9 +59,11 @@ int main(int argc, char* argv[]) {
             d_rho, NX, NY, NZ
         );
 
+        /*
         initPhase<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
             d_phi, DIAM, NX, NY, NZ
         ); 
+        */
 
         initDist<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
             d_rho, d_phi, d_f, d_g, NX, NY, NZ
