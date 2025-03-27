@@ -132,6 +132,20 @@ __global__ void curvatureCalc(
 }
 */
 
+__device__ __forceinline__ float calcPhi(const float* __restrict__ g, int idx, int stride) {
+    float phi_val = g[idx];
+    #pragma unroll
+    for (int l = 1; l < 19; ++l) {
+        phi_val += g[idx + l * stride];
+    }
+    #ifdef D3Q27
+    for (int l = 19; l < 27; ++l) {
+        phi_val += g[idx + l * stride];
+    }
+    #endif
+    return phi_val;
+}
+
 __global__ void computeInterface(
     float * __restrict__ phi,
     const float * __restrict__ g,
@@ -146,15 +160,13 @@ __global__ void computeInterface(
 
     if (i >= NX || j >= NY || k >= NZ || i == 0 || i == NX-1 || j == 0 || j == NY-1 || k == 0 || k == NZ-1) return;
 
-    // register 3D and stride
-    int idx = inline3D(i,j,k,NX,NY);
+    int idx = inline3D(i, j, k, NX, NY);
     int stride = NX * NY * NZ;
-    
-    // shared std & halo
-    int sx = threadIdx.x, hx = threadIdx.x + 1; 
-    int sy = threadIdx.y, hy = threadIdx.y + 1;
-    int sz = threadIdx.z, hz = threadIdx.z + 1;
-    int s_idx = shared3D(sx,sy,sz);
+
+    int sx = threadIdx.x, hx = sx + 1;
+    int sy = threadIdx.y, hy = sy + 1;
+    int sz = threadIdx.z, hz = sz + 1;
+    int s_idx = shared3D(sx, sy, sz);
 
     __shared__ float s_phi[TILE_Z][TILE_Y][TILE_X];
     __shared__ float s_normx[TILE_Z][TILE_Y][TILE_X];
@@ -165,26 +177,31 @@ __global__ void computeInterface(
     __shared__ float s_ffy[BLOCK_SIZE];
     __shared__ float s_ffz[BLOCK_SIZE];
 
-    // phase field
-    s_phi[hz][hy][hx] = g[idx] + 
-                        g[idx + 1 * stride] + g[idx + 2 * stride] + g[idx + 3 * stride] + 
-                        g[idx + 4 * stride] + g[idx + 5 * stride] + g[idx + 6 * stride] + 
-                        g[idx + 7 * stride] + g[idx + 8 * stride] + g[idx + 9 * stride] + 
-                        g[idx + 10 * stride] + g[idx + 11 * stride] + g[idx + 12 * stride] + 
-                        g[idx + 13 * stride] + g[idx + 14 * stride] + g[idx + 15 * stride] + 
-                        g[idx + 16 * stride] + g[idx + 17 * stride] + g[idx + 18 * stride];
+    // centro
+    s_phi[hz][hy][hx] = calcPhi(g, idx, stride);
 
-    #ifdef D3Q27
-        s_phi[hz][hy][hx] += g[idx + 19 * stride] + g[idx + 20 * stride] +
-                                g[idx + 21 * stride] + g[idx + 22 * stride] + 
-                                g[idx + 23 * stride] + g[idx + 24 * stride] +
-                                g[idx + 25 * stride] + g[idx + 26 * stride];
-    #endif
+    // halos em X
+    if (sx == 0 && i > 0)
+        s_phi[hz][hy][hx - 1] = calcPhi(g, inline3D(i - 1, j, k, NX, NY), stride);
+    if (sx == BLOCK_X - 1 && i < NX - 1)
+        s_phi[hz][hy][hx + 1] = calcPhi(g, inline3D(i + 1, j, k, NX, NY), stride);
+
+    // halos em Y
+    if (sy == 0 && j > 0)
+        s_phi[hz][hy - 1][hx] = calcPhi(g, inline3D(i, j - 1, k, NX, NY), stride);
+    if (sy == BLOCK_Y - 1 && j < NY - 1)
+        s_phi[hz][hy + 1][hx] = calcPhi(g, inline3D(i, j + 1, k, NX, NY), stride);
+
+    // halos em Z
+    if (sz == 0 && k > 0)
+        s_phi[hz - 1][hy][hx] = calcPhi(g, inline3D(i, j, k - 1, NX, NY), stride);
+    if (sz == BLOCK_Z - 1 && k < NZ - 1)
+        s_phi[hz + 1][hy][hx] = calcPhi(g, inline3D(i, j, k + 1, NX, NY), stride);
 
     __syncthreads();
 
-    // gradients and normals
-    float grad_fix = 0.0f, grad_fiy = 0.0f, grad_fiz = 0.0f;
+    // gradiente
+    float grad_fx = 0.0f, grad_fy = 0.0f, grad_fz = 0.0f;
     #pragma unroll 19
     for (int l = 0; l < NLINKS; ++l) {
         int xx = hx + CIX[l];
@@ -192,32 +209,35 @@ __global__ void computeInterface(
         int zz = hz + CIZ[l];
         float val = s_phi[zz][yy][xx];
         float coef = 3.0f * W[l];
-        grad_fix += coef * CIX[l] * val;
-        grad_fiy += coef * CIY[l] * val;
-        grad_fiz += coef * CIZ[l] * val;
+        grad_fx += coef * CIX[l] * val;
+        grad_fy += coef * CIY[l] * val;
+        grad_fz += coef * CIZ[l] * val;
     }
-    float gmag_sq = grad_fix * grad_fix + grad_fiy * grad_fiy + grad_fiz * grad_fiz;
-    float factor = rsqrtf(fmaxf(gmag_sq, 1e-9));
 
-    s_normx[hz][hy][hx] = grad_fix * factor;
-    s_normy[hz][hy][hx] = grad_fiy * factor;
-    s_normz[hz][hy][hx] = grad_fiz * factor; 
-    s_indicator[s_idx] = gmag_sq * factor;  
+    float gmag_sq = grad_fx * grad_fx + grad_fy * grad_fy + grad_fz * grad_fz;
+    float factor = rsqrtf(fmaxf(gmag_sq, 1e-9f));
+
+    s_normx[hz][hy][hx] = grad_fx * factor;
+    s_normy[hz][hy][hx] = grad_fy * factor;
+    s_normz[hz][hy][hx] = grad_fz * factor;
+    s_indicator[s_idx] = gmag_sq * factor;
 
     __syncthreads();
 
+    // curvatura
     float curv = 0.0f;
     #pragma unroll 19
     for (int l = 0; l < NLINKS; ++l) {
         int xx = hx + CIX[l];
         int yy = hy + CIY[l];
         int zz = hz + CIZ[l];
-        float normxN = s_normx[zz][yy][xx];
-        float normyN = s_normy[zz][yy][xx];
-        float normzN = s_normz[zz][yy][xx];
+        float nxN = s_normx[zz][yy][xx];
+        float nyN = s_normy[zz][yy][xx];
+        float nzN = s_normz[zz][yy][xx];
         float coef = 3.0f * W[l];
-        curv -= coef * (CIX[l] * normxN + CIY[l] * normyN + CIZ[l] * normzN);
+        curv -= coef * (CIX[l] * nxN + CIY[l] * nyN + CIZ[l] * nzN);
     }
+
     float mult = SIGMA * curv;
     s_ffx[s_idx] = mult * s_normx[hz][hy][hx] * s_indicator[s_idx];
     s_ffy[s_idx] = mult * s_normy[hz][hy][hx] * s_indicator[s_idx];
@@ -225,7 +245,7 @@ __global__ void computeInterface(
 
     __syncthreads();
 
-    // write shared stuff to global memory
+    // grava resultados
     phi[idx] = s_phi[hz][hy][hx];
     ffx[idx] = s_ffx[s_idx];
     ffy[idx] = s_ffy[s_idx];
