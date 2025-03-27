@@ -1,10 +1,10 @@
 #include "var.cuh"
 
-//int MESH = 64;
+int MESH = 128;
 
 // extern vars
-int DIAM = 13;
-int NX = 128; int NY = 128; int NZ = 128*4;  
+int DIAM = ceil(MESH);
+int NX = MESH; int NY = MESH; int NZ = MESH*4;  
 float U_JET = 0.05f; 
 
 __constant__ float CSSQ;

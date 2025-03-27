@@ -32,6 +32,7 @@ __global__ void initDist(
 
 // ============================================================================================== //
 
+/*
 __global__ void phiCalc(
     float * __restrict__ phi,
     const float * __restrict__ g,
@@ -53,6 +54,16 @@ __global__ void curvatureCalc(
     const float * __restrict__ normx,
     const float * __restrict__ normy,
     const float * __restrict__ normz,
+    float * __restrict__ ffx,
+    float * __restrict__ ffy,
+    float * __restrict__ ffz,
+    const int NX, const int NY, const int NZ
+);
+*/
+
+__global__ void computeInterface(
+    float * __restrict__ phi,
+    const float * __restrict__ g,
     float * __restrict__ ffx,
     float * __restrict__ ffy,
     float * __restrict__ ffz,

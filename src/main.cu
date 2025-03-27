@@ -73,9 +73,17 @@ int main(int argc, char* argv[]) {
 
     vector<float> phi_host(NX * NY * NZ);
 
+    size_t shared_3D_size = TILE_X * TILE_Y * TILE_Z * sizeof(float); // por array 3D
+    size_t shared_1D_size = BLOCK_SIZE * sizeof(float);               // por array 1D
+    size_t total_3D = 4 * shared_3D_size;
+    size_t total_1D = 4 * shared_1D_size;
+
+    size_t total_shared = total_3D + total_1D;
+
     for (int STEP = 0; STEP <= NSTEPS ; ++STEP) {
         cout << "Passo " << STEP << " de " << NSTEPS << " iniciado..." << endl;
 
+        /*
         // ================= PHASE FIELD ================= //
 
             phiCalc<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
@@ -107,8 +115,13 @@ int main(int argc, char* argv[]) {
             ); 
 
         // =================================================== //   
+        */
 
-
+        computeInterface<<<numBlocks, threadsPerBlock, total_shared, mainStream>>> (
+            d_phi, d_g,
+            d_ffx, d_ffy, d_ffz,
+            NX, NY, NZ
+        );
         
         // ===================== MOMENTI ===================== //
 

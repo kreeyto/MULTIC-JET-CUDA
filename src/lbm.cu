@@ -2,27 +2,34 @@
 
 // ================================================================================================== //
 
+/*
 __global__ void phiCalc(
     float * __restrict__ phi,
     const float * __restrict__ g,
     const int NX, const int NY, const int NZ
 ) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
-    int k = blockIdx.z * blockDim.z + threadIdx.z;
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int j = threadIdx.y + blockIdx.y * blockDim.y;
+    int k = threadIdx.z + blockIdx.z * blockDim.z;
 
     if (i >= NX || j >= NY || k >= NZ || i == 0 || i == NX-1 || j == 0 || j == NY-1 || k == 0 || k == NZ-1) return;
 
-    int idx3D = inline3D(i,j,k,NX,NY);
+    int idx = inline3D(i,j,k,NX,NY);
+    int stride = NX * NY * NZ;
 
-    float sum = 0.0f;  
-    #pragma unroll 19     
-    for (int l = 0; l < NLINKS; ++l) {
-        int idx4D = inline4D(i,j,k,l,NX,NY,NZ);
-        sum += g[idx4D];
-    }
-
-    phi[idx3D] = sum;
+    phi[idx] = g[idx] + 
+               g[idx + 1 * stride] + g[idx + 2 * stride] + g[idx + 3 * stride] + 
+               g[idx + 4 * stride] + g[idx + 5 * stride] + g[idx + 6 * stride] + 
+               g[idx + 7 * stride] + g[idx + 8 * stride] + g[idx + 9 * stride] + 
+               g[idx + 10 * stride] + g[idx + 11 * stride] + g[idx + 12 * stride] + 
+               g[idx + 13 * stride] + g[idx + 14 * stride] + g[idx + 15 * stride] + 
+               g[idx + 16 * stride] + g[idx + 17 * stride] + g[idx + 18 * stride];
+    #ifdef D3Q27
+        phi[idx] = g[idx + 19 * stride] + g[idx + 20 * stride] +
+                   g[idx + 21 * stride] + g[idx + 22 * stride] + 
+                   g[idx + 23 * stride] + g[idx + 24 * stride] +
+                   g[idx + 25 * stride] + g[idx + 26 * stride];
+    #endif
 }
 
 // =================================================================================================== //
@@ -39,9 +46,9 @@ __global__ void gradCalc(
     float * __restrict__ indicator,
     const int NX, const int NY, const int NZ
 ) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
-    int k = blockIdx.z * blockDim.z + threadIdx.z;
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int j = threadIdx.y + blockIdx.y * blockDim.y;
+    int k = threadIdx.z + blockIdx.z * blockDim.z;
 
     if (i >= NX || j >= NY || k >= NZ || i == 0 || i == NX-1 || j == 0 || j == NY-1 || k == 0 || k == NZ-1) return;
 
@@ -88,9 +95,9 @@ __global__ void curvatureCalc(
     float * __restrict__ ffz,
     const int NX, const int NY, const int NZ
 ) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
-    int k = blockIdx.z * blockDim.z + threadIdx.z;
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int j = threadIdx.y + blockIdx.y * blockDim.y;
+    int k = threadIdx.z + blockIdx.z * blockDim.z;
 
     if (i >= NX || j >= NY || k >= NZ || i == 0 || i == NX-1 || j == 0 || j == NY-1 || k == 0 || k == NZ-1) return;
 
@@ -123,9 +130,109 @@ __global__ void curvatureCalc(
     ffy[idx3D] = mult * normy_ * ind_;
     ffz[idx3D] = mult * normz_ * ind_;
 }
+*/
+
+__global__ void computeInterface(
+    float * __restrict__ phi,
+    const float * __restrict__ g,
+    float * __restrict__ ffx,
+    float * __restrict__ ffy,
+    float * __restrict__ ffz,
+    const int NX, const int NY, const int NZ
+) {
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int j = threadIdx.y + blockIdx.y * blockDim.y;
+    int k = threadIdx.z + blockIdx.z * blockDim.z;
+
+    if (i >= NX || j >= NY || k >= NZ || i == 0 || i == NX-1 || j == 0 || j == NY-1 || k == 0 || k == NZ-1) return;
+
+    // register 3D and stride
+    int idx = inline3D(i,j,k,NX,NY);
+    int stride = NX * NY * NZ;
+    
+    // shared std & halo
+    int sx = threadIdx.x, hx = threadIdx.x + 1; 
+    int sy = threadIdx.y, hy = threadIdx.y + 1;
+    int sz = threadIdx.z, hz = threadIdx.z + 1;
+    int s_idx = shared3D(sx,sy,sz);
+
+    __shared__ float s_phi[TILE_Z][TILE_Y][TILE_X];
+    __shared__ float s_normx[TILE_Z][TILE_Y][TILE_X];
+    __shared__ float s_normy[TILE_Z][TILE_Y][TILE_X];
+    __shared__ float s_normz[TILE_Z][TILE_Y][TILE_X];
+    __shared__ float s_indicator[BLOCK_SIZE];
+    __shared__ float s_ffx[BLOCK_SIZE];
+    __shared__ float s_ffy[BLOCK_SIZE];
+    __shared__ float s_ffz[BLOCK_SIZE];
+
+    // phase field
+    s_phi[hz][hy][hx] = g[idx] + 
+                        g[idx + 1 * stride] + g[idx + 2 * stride] + g[idx + 3 * stride] + 
+                        g[idx + 4 * stride] + g[idx + 5 * stride] + g[idx + 6 * stride] + 
+                        g[idx + 7 * stride] + g[idx + 8 * stride] + g[idx + 9 * stride] + 
+                        g[idx + 10 * stride] + g[idx + 11 * stride] + g[idx + 12 * stride] + 
+                        g[idx + 13 * stride] + g[idx + 14 * stride] + g[idx + 15 * stride] + 
+                        g[idx + 16 * stride] + g[idx + 17 * stride] + g[idx + 18 * stride];
+
+    #ifdef D3Q27
+        s_phi[hz][hy][hx] += g[idx + 19 * stride] + g[idx + 20 * stride] +
+                                g[idx + 21 * stride] + g[idx + 22 * stride] + 
+                                g[idx + 23 * stride] + g[idx + 24 * stride] +
+                                g[idx + 25 * stride] + g[idx + 26 * stride];
+    #endif
+
+    __syncthreads();
+
+    // gradients and normals
+    float grad_fix = 0.0f, grad_fiy = 0.0f, grad_fiz = 0.0f;
+    #pragma unroll 19
+    for (int l = 0; l < NLINKS; ++l) {
+        int xx = hx + CIX[l];
+        int yy = hy + CIY[l];
+        int zz = hz + CIZ[l];
+        float val = s_phi[zz][yy][xx];
+        float coef = 3.0f * W[l];
+        grad_fix += coef * CIX[l] * val;
+        grad_fiy += coef * CIY[l] * val;
+        grad_fiz += coef * CIZ[l] * val;
+    }
+    float gmag_sq = grad_fix * grad_fix + grad_fiy * grad_fiy + grad_fiz * grad_fiz;
+    float factor = rsqrtf(fmaxf(gmag_sq, 1e-9));
+
+    s_normx[hz][hy][hx] = grad_fix * factor;
+    s_normy[hz][hy][hx] = grad_fiy * factor;
+    s_normz[hz][hy][hx] = grad_fiz * factor; 
+    s_indicator[s_idx] = gmag_sq * factor;  
+
+    __syncthreads();
+
+    float curv = 0.0f;
+    #pragma unroll 19
+    for (int l = 0; l < NLINKS; ++l) {
+        int xx = hx + CIX[l];
+        int yy = hy + CIY[l];
+        int zz = hz + CIZ[l];
+        float normxN = s_normx[zz][yy][xx];
+        float normyN = s_normy[zz][yy][xx];
+        float normzN = s_normz[zz][yy][xx];
+        float coef = 3.0f * W[l];
+        curv -= coef * (CIX[l] * normxN + CIY[l] * normyN + CIZ[l] * normzN);
+    }
+    float mult = SIGMA * curv;
+    s_ffx[s_idx] = mult * s_normx[hz][hy][hx] * s_indicator[s_idx];
+    s_ffy[s_idx] = mult * s_normy[hz][hy][hx] * s_indicator[s_idx];
+    s_ffz[s_idx] = mult * s_normz[hz][hy][hx] * s_indicator[s_idx];
+
+    __syncthreads();
+
+    // write shared stuff to global memory
+    phi[idx] = s_phi[hz][hy][hx];
+    ffx[idx] = s_ffx[s_idx];
+    ffy[idx] = s_ffy[s_idx];
+    ffz[idx] = s_ffz[s_idx];
+}
 
 // =================================================================================================== //
-
 
 
 
@@ -148,9 +255,9 @@ __global__ void momentiCalc(
     float * __restrict__ pyz,
     const int NX, const int NY, const int NZ
 ) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
-    int k = blockIdx.z * blockDim.z + threadIdx.z;
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int j = threadIdx.y + blockIdx.y * blockDim.y;
+    int k = threadIdx.z + blockIdx.z * blockDim.z;
     
     if (i >= NX || j >= NY || k >= NZ || i == 0 || i == NX-1 || j == 0 || j == NY-1 || k == 0 || k == NZ-1) return;
 
@@ -250,9 +357,9 @@ __global__ void collisionFluid(
     const float * __restrict__ pyz,
     const int NX, const int NY, const int NZ
 ) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
-    int k = blockIdx.z * blockDim.z + threadIdx.z;
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int j = threadIdx.y + blockIdx.y * blockDim.y;
+    int k = threadIdx.z + blockIdx.z * blockDim.z;
 
     if (i >= NX || j >= NY || k >= NZ || i == 0 || i == NX-1 || j == 0 || j == NY-1 || k == 0 || k == NZ-1) return;
 
@@ -303,9 +410,9 @@ __global__ void collisionPhase(
     const float * __restrict__ normz,
     const int NX, const int NY, const int NZ
 ) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
-    int k = blockIdx.z * blockDim.z + threadIdx.z;
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int j = threadIdx.y + blockIdx.y * blockDim.y;
+    int k = threadIdx.z + blockIdx.z * blockDim.z;
 
     if (i >= NX || j >= NY || k >= NZ || i == 0 || i == NX-1 || j == 0 || j == NY-1 || k == 0 || k == NZ-1) return;
 
@@ -360,9 +467,9 @@ __global__ void fgBoundary(
     const int NX, const int NY, const int NZ,
     const int STEP, const int MACRO_SAVE
 ) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
-    int k = blockIdx.z * blockDim.z + threadIdx.z;
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int j = threadIdx.y + blockIdx.y * blockDim.y;
+    int k = threadIdx.z + blockIdx.z * blockDim.z;
     
     if (k != 0) return; 
     
