@@ -24,36 +24,6 @@ __global__ void initTensor(
     rho[idx3D] = val;
 }
 
-/*
-__global__ void initPhase(
-    float * __restrict__ phi, 
-    const int DIAM, const int NX, const int NY, const int NZ
-) {
-    int i = blockIdx.x * blockDim.x + threadIdx.x;
-    int j = blockIdx.y * blockDim.y + threadIdx.y;
-    int k = blockIdx.z * blockDim.z + threadIdx.z;
-
-    if (i >= NX || j >= NY || k >= NZ) return;
-
-    int idx3D = inline3D(i,j,k,NX,NY);
-
-    float center_x = NX * 0.5f;
-    float center_y = NY * 0.5f;
-
-    float dx = i - center_x;
-    float dy = j - center_y;
-    float Ri = sqrt(dx*dx + dy*dy);
-
-    float phi_val = 0.5f + 0.5f * tanh(2.0f * (DIAM - Ri) / 3.0f);
-
-    if (k == 0) { 
-        phi[idx3D] = phi_val;
-    }
-}
-*/
-
-// =================================================================================================== //
-
 __global__ void initDist(
     const float * __restrict__ rho, 
     const float * __restrict__ phi, 

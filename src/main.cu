@@ -59,12 +59,6 @@ int main(int argc, char* argv[]) {
             d_rho, NX, NY, NZ
         );
 
-        /*
-        initPhase<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
-            d_phi, DIAM, NX, NY, NZ
-        ); 
-        */
-
         initDist<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
             d_rho, d_phi, d_f, d_g, NX, NY, NZ
         ); 
@@ -73,10 +67,10 @@ int main(int argc, char* argv[]) {
 
     vector<float> phi_host(NX * NY * NZ);
 
-    size_t shared_3D_size = TILE_X * TILE_Y * TILE_Z * sizeof(float); // por array 3D
+    size_t shared_3D_size = BLOCK_X+2 * BLOCK_Y+2 * BLOCK_Z+2 * sizeof(float); // por array 3D
     size_t shared_1D_size = BLOCK_SIZE * sizeof(float);               // por array 1D
     size_t total_3D = 4 * shared_3D_size;
-    size_t total_1D = 4 * shared_1D_size;
+    size_t total_1D = 3 * shared_1D_size;
 
     size_t total_shared = total_3D + total_1D;
 

@@ -54,7 +54,7 @@ __global__ void gradCalc(
 
     int idx3D = inline3D(i,j,k,NX,NY);
 
-    float grad_fix = 0.0f, grad_fiy = 0.0f, grad_fiz = 0.0f;
+    float grad_x = 0.0f, grad_y = 0.0f, grad_z = 0.0f;
     #pragma unroll 19
     for (int l = 0; l < NLINKS; ++l) {
         int ii = i + CIX[l];
@@ -64,17 +64,17 @@ __global__ void gradCalc(
         int offset = inline3D(ii,jj,kk,NX,NY);
         float val = phi[offset];
         float coef = 3.0f * W[l];
-        grad_fix += coef * CIX[l] * val;
-        grad_fiy += coef * CIY[l] * val;
-        grad_fiz += coef * CIZ[l] * val;
+        grad_x += coef * CIX[l] * val;
+        grad_y += coef * CIY[l] * val;
+        grad_z += coef * CIZ[l] * val;
     }
     
-    float gmag_sq = grad_fix * grad_fix + grad_fiy * grad_fiy + grad_fiz * grad_fiz;
+    float gmag_sq = grad_x * grad_x + grad_y * grad_y + grad_z * grad_z;
     float factor = rsqrtf(fmaxf(gmag_sq, 1e-9));
 
-    normx[idx3D] = grad_fix * factor;
-    normy[idx3D] = grad_fiy * factor;
-    normz[idx3D] = grad_fiz * factor; 
+    normx[idx3D] = grad_x * factor;
+    normy[idx3D] = grad_y * factor;
+    normz[idx3D] = grad_z * factor; 
     indicator[idx3D] = gmag_sq * factor;  
 }
 
@@ -116,11 +116,11 @@ __global__ void curvatureCalc(
         int kk = k + CIZ[l];
 
         int offset = inline3D(ii,jj,kk,NX,NY);
-        float normxN = normx[offset];
-        float normyN = normy[offset];
-        float normzN = normz[offset];
+        float nox = normx[offset];
+        float noy = normy[offset];
+        float noz = normz[offset];
         float coef = 3.0f * W[l];
-        curv -= coef * (CIX[l] * normxN + CIY[l] * normyN + CIZ[l] * normzN);
+        curv -= coef * (CIX[l] * nox + CIY[l] * noy + CIZ[l] * noz);
     }
 
     float mult = SIGMA * curv;
@@ -145,90 +145,75 @@ __global__ void computeInterface(
     int k = threadIdx.z + blockIdx.z * blockDim.z;
 
     if (i >= NX || j >= NY || k >= NZ || i == 0 || i == NX-1 || j == 0 || j == NY-1 || k == 0 || k == NZ-1) return;
-
-    // register 3D and stride
+    // if (sx == 0 || sx == BLOCK_X-1 || sy == 0 || sy == BLOCK_Y-1 || sz == 0 || sz == BLOCK_Z-1) return;
     int idx = inline3D(i,j,k,NX,NY);
-    int stride = NX * NY * NZ;
     
-    // shared std & halo
-    int sx = threadIdx.x, hx = sx + 1; 
-    int sy = threadIdx.y, hy = sy + 1;
-    int sz = threadIdx.z, hz = sz + 1;
-    int s_idx = shared3D(sx,sy,sz);
+    // 's'hared & 'h'alo indexes
+    int sx = threadIdx.x, hx = threadIdx.x + 1; 
+    int sy = threadIdx.y, hy = threadIdx.y + 1;
+    int sz = threadIdx.z, hz = threadIdx.z + 1;
+    int s_idx = sx + sy * BLOCK_X + sz * BLOCK_X * BLOCK_Y;
 
-    __shared__ float s_phi[TILE_Z][TILE_Y][TILE_X];
-    __shared__ float s_normx[TILE_Z][TILE_Y][TILE_X];
-    __shared__ float s_normy[TILE_Z][TILE_Y][TILE_X];
-    __shared__ float s_normz[TILE_Z][TILE_Y][TILE_X];
-    __shared__ float s_indicator[BLOCK_SIZE];
-    __shared__ float s_ffx[BLOCK_SIZE];
-    __shared__ float s_ffy[BLOCK_SIZE];
-    __shared__ float s_ffz[BLOCK_SIZE];
+    // shared memory setup
+    __shared__ float s_phi[BLOCK_Z+2][BLOCK_Y+2][BLOCK_X+2];
+    __shared__ float s_normx[BLOCK_Z+2][BLOCK_Y+2][BLOCK_X+2];
+    __shared__ float s_normy[BLOCK_Z+2][BLOCK_Y+2][BLOCK_X+2];
+    __shared__ float s_normz[BLOCK_Z+2][BLOCK_Y+2][BLOCK_X+2];
 
     // phase field
-    s_phi[hz][hy][hx] = g[IDX4D(i,j,k,0)] + 
-                        g[IDX4D(i,j,k,1)] + g[IDX4D(i,j,k,2)] + g[IDX4D(i,j,k,3)] + 
-                        g[IDX4D(i,j,k,4)] + g[IDX4D(i,j,k,5)] + g[IDX4D(i,j,k,6)] + 
-                        g[IDX4D(i,j,k,7)] + g[IDX4D(i,j,k,8)] + g[IDX4D(i,j,k,9)] + 
-                        g[IDX4D(i,j,k,10)] + g[IDX4D(i,j,k,11)] + g[IDX4D(i,j,k,12)] + 
-                        g[IDX4D(i,j,k,13)] + g[IDX4D(i,j,k,14)] + g[IDX4D(i,j,k,15)] + 
-                        g[IDX4D(i,j,k,16)] + g[IDX4D(i,j,k,17)] + g[IDX4D(i,j,k,18)];
-    #ifdef D3Q27
-        s_phi[hz][hy][hx] += g[IDX4D(i,j,k,19)] + g[IDX4D(i,j,k,20)] +
-                             g[IDX4D(i,j,k,21)] + g[IDX4D(i,j,k,22)] + 
-                             g[IDX4D(i,j,k,23)] + g[IDX4D(i,j,k,24)] +
-                             g[IDX4D(i,j,k,25)] + g[IDX4D(i,j,k,26)];
-    #endif
+    float phi_local = 0.0f;
+    #pragma unroll 19
+    for (int l = 0; l < NLINKS; ++l)
+        int idx4D = inline4D(i,j,k,l,NX,NY,NZ);
+        phi_local += g[idx4D];
+    s_phi[hz][hy][hx] = phi_local;
 
     __syncthreads();
 
     // gradients and normals
-    float grad_fix = 0.0f, grad_fiy = 0.0f, grad_fiz = 0.0f;
+    float grad_x = 0.0f, grad_y = 0.0f, grad_z = 0.0f;
     #pragma unroll 19
     for (int l = 0; l < NLINKS; ++l) {
-        int xx = hx + CIX[l];
-        int yy = hy + CIY[l];
-        int zz = hz + CIZ[l];
-        float val = s_phi[zz][yy][xx];
+        float val = s_phi[hz + CIZ[l]][hy + CIY[l]][hx + CIX[l]];
         float coef = 3.0f * W[l];
-        grad_fix += coef * CIX[l] * val;
-        grad_fiy += coef * CIY[l] * val;
-        grad_fiz += coef * CIZ[l] * val;
+        grad_x += coef * CIX[l] * val;
+        grad_y += coef * CIY[l] * val;
+        grad_z += coef * CIZ[l] * val;
     }
-    float gmag_sq = grad_fix * grad_fix + grad_fiy * grad_fiy + grad_fiz * grad_fiz;
+    float gmag_sq = grad_x * grad_x + grad_y * grad_y + grad_z * grad_z;
     float factor = rsqrtf(fmaxf(gmag_sq, 1e-9));
 
-    s_normx[hz][hy][hx] = grad_fix * factor;
-    s_normy[hz][hy][hx] = grad_fiy * factor;
-    s_normz[hz][hy][hx] = grad_fiz * factor; 
-    s_indicator[s_idx] = gmag_sq * factor;  
+    s_normx[hz][hy][hx] = grad_x * factor;
+    s_normy[hz][hy][hx] = grad_y * factor;
+    s_normz[hz][hy][hx] = grad_z * factor; 
+    float indicator = gmag_sq * factor;  
 
     __syncthreads();
 
     float curv = 0.0f;
     #pragma unroll 19
     for (int l = 0; l < NLINKS; ++l) {
-        int xx = hx + CIX[l];
-        int yy = hy + CIY[l];
-        int zz = hz + CIZ[l];
-        float normxN = s_normx[zz][yy][xx];
-        float normyN = s_normy[zz][yy][xx];
-        float normzN = s_normz[zz][yy][xx];
+        float nox = s_normx[hz + CIZ[l]][hy + CIY[l]][hx + CIX[l]];
+        float noy = s_normy[hz + CIZ[l]][hy + CIY[l]][hx + CIX[l]];
+        float noz = s_normz[hz + CIZ[l]][hy + CIY[l]][hx + CIX[l]];
         float coef = 3.0f * W[l];
-        curv -= coef * (CIX[l] * normxN + CIY[l] * normyN + CIZ[l] * normzN);
+        curv -= coef * (CIX[l] * nox + CIY[l] * noy + CIZ[l] * noz);
     }
     float mult = SIGMA * curv;
-    s_ffx[s_idx] = mult * s_normx[hz][hy][hx] * s_indicator[s_idx];
-    s_ffy[s_idx] = mult * s_normy[hz][hy][hx] * s_indicator[s_idx];
-    s_ffz[s_idx] = mult * s_normz[hz][hy][hx] * s_indicator[s_idx];
+    float ffx_local = mult * s_normx[hz][hy][hx] * indicator;
+    float ffy_local = mult * s_normy[hz][hy][hx] * indicator;
+    float ffz_local = mult * s_normz[hz][hy][hx] * indicator;
 
     __syncthreads();
 
-    // write shared stuff to global memory
-    phi[idx] = s_phi[hz][hy][hx];
-    ffx[idx] = s_ffx[s_idx];
-    ffy[idx] = s_ffy[s_idx];
-    ffz[idx] = s_ffz[s_idx];
+    // write back to global memory (excluding halo cells)
+    if (sx >= 1 && sx <= BLOCK_X-2 && sy >= 1 && sy <= BLOCK_Y-2 && sz >= 1 && sz <= BLOCK_Z-2) {
+        phi[idx] = s_phi[hz][hy][hx];
+    }
+    // write normally
+    ffx[idx] = ffx_local;
+    ffy[idx] = ffy_local;
+    ffz[idx] = ffz_local;
 }
 
 // =================================================================================================== //
