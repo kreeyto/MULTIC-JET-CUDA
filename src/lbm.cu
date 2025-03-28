@@ -15,21 +15,14 @@ __global__ void phiCalc(
     if (i >= NX || j >= NY || k >= NZ || i == 0 || i == NX-1 || j == 0 || j == NY-1 || k == 0 || k == NZ-1) return;
 
     int idx = inline3D(i,j,k,NX,NY);
-    int stride = NX * NY * NZ;
 
-    phi[idx] = g[idx] + 
-               g[idx + 1 * stride] + g[idx + 2 * stride] + g[idx + 3 * stride] + 
-               g[idx + 4 * stride] + g[idx + 5 * stride] + g[idx + 6 * stride] + 
-               g[idx + 7 * stride] + g[idx + 8 * stride] + g[idx + 9 * stride] + 
-               g[idx + 10 * stride] + g[idx + 11 * stride] + g[idx + 12 * stride] + 
-               g[idx + 13 * stride] + g[idx + 14 * stride] + g[idx + 15 * stride] + 
-               g[idx + 16 * stride] + g[idx + 17 * stride] + g[idx + 18 * stride];
-    #ifdef D3Q27
-        phi[idx] = g[idx + 19 * stride] + g[idx + 20 * stride] +
-                   g[idx + 21 * stride] + g[idx + 22 * stride] + 
-                   g[idx + 23 * stride] + g[idx + 24 * stride] +
-                   g[idx + 25 * stride] + g[idx + 26 * stride];
-    #endif
+    float phi_local = 0.0f;
+    #pragma unroll 19
+    for (int l = 0; l < NLINKS; ++l) {
+        int idx4D = inline4D(i,j,k,l,NX,NY,NZ);
+        phi_local += g[idx4D];
+    }
+    phi[idx] = phi_local;
 }
 
 // =================================================================================================== //
@@ -144,29 +137,30 @@ __global__ void computeInterface(
     int j = threadIdx.y + blockIdx.y * blockDim.y;
     int k = threadIdx.z + blockIdx.z * blockDim.z;
 
+    // local idx
+    int sx = threadIdx.x, sy = threadIdx.y, sz = threadIdx.z;
+
     if (i >= NX || j >= NY || k >= NZ || i == 0 || i == NX-1 || j == 0 || j == NY-1 || k == 0 || k == NZ-1) return;
-    // if (sx == 0 || sx == BLOCK_X-1 || sy == 0 || sy == BLOCK_Y-1 || sz == 0 || sz == BLOCK_Z-1) return;
     int idx = inline3D(i,j,k,NX,NY);
-    
-    // 's'hared & 'h'alo indexes
-    int sx = threadIdx.x, hx = threadIdx.x + 1; 
-    int sy = threadIdx.y, hy = threadIdx.y + 1;
-    int sz = threadIdx.z, hz = threadIdx.z + 1;
-    int s_idx = sx + sy * BLOCK_X + sz * BLOCK_X * BLOCK_Y;
+    int s_idx = inline3D(sx,sy,sz,BLOCK_X,BLOCK_Y);
 
     // shared memory setup
     __shared__ float s_phi[BLOCK_Z+2][BLOCK_Y+2][BLOCK_X+2];
     __shared__ float s_normx[BLOCK_Z+2][BLOCK_Y+2][BLOCK_X+2];
     __shared__ float s_normy[BLOCK_Z+2][BLOCK_Y+2][BLOCK_X+2];
     __shared__ float s_normz[BLOCK_Z+2][BLOCK_Y+2][BLOCK_X+2];
+    __shared__ float s_ffx[BLOCK_X * BLOCK_Y * BLOCK_Z];
+    __shared__ float s_ffy[BLOCK_X * BLOCK_Y * BLOCK_Z];
+    __shared__ float s_ffz[BLOCK_X * BLOCK_Y * BLOCK_Z];
 
     // phase field
-    float phi_local = 0.0f;
+    float sum = 0.0f;
     #pragma unroll 19
-    for (int l = 0; l < NLINKS; ++l)
+    for (int l = 0; l < NLINKS; ++l) {
         int idx4D = inline4D(i,j,k,l,NX,NY,NZ);
-        phi_local += g[idx4D];
-    s_phi[hz][hy][hx] = phi_local;
+        sum += g[idx4D];
+    }
+    s_phi[sz][sy][sx] = sum;
 
     __syncthreads();
 
@@ -174,46 +168,42 @@ __global__ void computeInterface(
     float grad_x = 0.0f, grad_y = 0.0f, grad_z = 0.0f;
     #pragma unroll 19
     for (int l = 0; l < NLINKS; ++l) {
-        float val = s_phi[hz + CIZ[l]][hy + CIY[l]][hx + CIX[l]];
+        float val = s_phi[sz + CIZ[l]][sy + CIY[l]][sx + CIX[l]];
         float coef = 3.0f * W[l];
         grad_x += coef * CIX[l] * val;
         grad_y += coef * CIY[l] * val;
         grad_z += coef * CIZ[l] * val;
     }
-    float gmag_sq = grad_x * grad_x + grad_y * grad_y + grad_z * grad_z;
+    float gmag_sq = grad_x*grad_x + grad_y*grad_y + grad_z*grad_z;
     float factor = rsqrtf(fmaxf(gmag_sq, 1e-9));
 
-    s_normx[hz][hy][hx] = grad_x * factor;
-    s_normy[hz][hy][hx] = grad_y * factor;
-    s_normz[hz][hy][hx] = grad_z * factor; 
-    float indicator = gmag_sq * factor;  
+    s_normx[sz][sy][sx] = grad_x * factor;
+    s_normy[sz][sy][sx] = grad_y * factor;
+    s_normz[sz][sy][sx] = grad_z * factor; 
+    float ind = gmag_sq * factor;  
 
     __syncthreads();
 
     float curv = 0.0f;
     #pragma unroll 19
     for (int l = 0; l < NLINKS; ++l) {
-        float nox = s_normx[hz + CIZ[l]][hy + CIY[l]][hx + CIX[l]];
-        float noy = s_normy[hz + CIZ[l]][hy + CIY[l]][hx + CIX[l]];
-        float noz = s_normz[hz + CIZ[l]][hy + CIY[l]][hx + CIX[l]];
+        float nox = s_normx[sz + CIZ[l]][sy + CIY[l]][sx + CIX[l]];
+        float noy = s_normy[sz + CIZ[l]][sy + CIY[l]][sx + CIX[l]];
+        float noz = s_normz[sz + CIZ[l]][sy + CIY[l]][sx + CIX[l]];
         float coef = 3.0f * W[l];
         curv -= coef * (CIX[l] * nox + CIY[l] * noy + CIZ[l] * noz);
     }
     float mult = SIGMA * curv;
-    float ffx_local = mult * s_normx[hz][hy][hx] * indicator;
-    float ffy_local = mult * s_normy[hz][hy][hx] * indicator;
-    float ffz_local = mult * s_normz[hz][hy][hx] * indicator;
+    s_ffx[s_idx] = mult * s_normx[sz][sy][sx] * ind;
+    s_ffy[s_idx] = mult * s_normy[sz][sy][sx] * ind;
+    s_ffz[s_idx] = mult * s_normz[sz][sy][sx] * ind;
 
     __syncthreads();
 
-    // write back to global memory (excluding halo cells)
-    if (sx >= 1 && sx <= BLOCK_X-2 && sy >= 1 && sy <= BLOCK_Y-2 && sz >= 1 && sz <= BLOCK_Z-2) {
-        phi[idx] = s_phi[hz][hy][hx];
-    }
-    // write normally
-    ffx[idx] = ffx_local;
-    ffy[idx] = ffy_local;
-    ffz[idx] = ffz_local;
+    phi[idx] = s_phi[sz][sy][sx];
+    ffx[idx] = s_ffx[s_idx];
+    ffy[idx] = s_ffy[s_idx];
+    ffz[idx] = s_ffz[s_idx];
 }
 
 // =================================================================================================== //
@@ -421,9 +411,9 @@ __global__ void collisionPhase(
         
         float udotc = (ux_val * CIX[l] + uy_val * CIY[l] + uz_val * CIZ[l]) * invCSSQ;
         float geq = W[l] * phi_val * (1.0f + udotc);
-        float Ai = W[l] * phi_norm * (CIX[l] * normx_val + CIY[l] * normy_val + CIZ[l] * normz_val);
+        float Hi = W[l] * phi_norm * (CIX[l] * normx_val + CIY[l] * normy_val + CIZ[l] * normz_val);
         int offset = inline4D(ii,jj,kk,l,NX,NY,NZ);
-        g[offset] = geq + Ai;
+        g[offset] = geq + Hi;
     }
 }
 
@@ -466,7 +456,8 @@ __global__ void fgBoundary(
     
     if (Ri > DIAM) return;
 
-    float u_in = U_JET * (1.0f + DATAZ[STEP / MACRO_SAVE] * 10);
+    //float u_in = U_JET * (1.0f + DATAZ[STEP / MACRO_SAVE] * 10);
+    float u_in = U_JET;
     float phi_in = 0.5f + 0.5f * tanh(2.0f * (DIAM - Ri) / 3.0f);
     
     int idx_in = inline3D(i,j,k,NX,NY);

@@ -3,9 +3,9 @@
 int MESH = 128;
 
 // extern vars
-int DIAM = ceil(MESH);
+int DIAM = ceil(MESH/10);
 int NX = MESH; int NY = MESH; int NZ = MESH*4;  
-float U_JET = 0.05f; 
+float U_JET = 0.1f; 
 
 __constant__ float CSSQ;
 __constant__ float OMEGA;

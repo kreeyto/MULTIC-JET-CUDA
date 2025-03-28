@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
     // ============================================================================================================================================================= //
 
     // ================================= //
-    int MACRO_SAVE = 100, NSTEPS = 25000;
+    int MACRO_SAVE = 100, NSTEPS = 1000;
     // ================================= //
     initializeVars();
 
@@ -67,19 +67,18 @@ int main(int argc, char* argv[]) {
 
     vector<float> phi_host(NX * NY * NZ);
 
-    size_t shared_3D_size = BLOCK_X+2 * BLOCK_Y+2 * BLOCK_Z+2 * sizeof(float); // por array 3D
-    size_t shared_1D_size = BLOCK_SIZE * sizeof(float);               // por array 1D
-    size_t total_3D = 4 * shared_3D_size;
-    size_t total_1D = 3 * shared_1D_size;
+    size_t shared_3D_size = (BLOCK_X+2 * BLOCK_Y+2 * BLOCK_Z+2) * sizeof(float); 
+    size_t shared_1D_size = (BLOCK_X * BLOCK_Y * BLOCK_Z) * sizeof(float);
+    size_t num_3D_sh = 4 * shared_3D_size;
+    size_t num_1D_sh = 3 * shared_1D_size;
 
-    size_t total_shared = total_3D + total_1D;
+    size_t total_shared = num_3D_sh + num_1D_sh;
 
     for (int STEP = 0; STEP <= NSTEPS ; ++STEP) {
         cout << "Passo " << STEP << " de " << NSTEPS << " iniciado..." << endl;
 
-        /*
         // ================= PHASE FIELD ================= //
-
+            /*
             phiCalc<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
                 d_phi, d_g, NX, NY, NZ
             ); 
@@ -107,9 +106,8 @@ int main(int argc, char* argv[]) {
                 d_ffx, d_ffy, d_ffz,
                 NX, NY, NZ
             ); 
-
+            */
         // =================================================== //   
-        */
 
         computeInterface<<<numBlocks, threadsPerBlock, total_shared, mainStream>>> (
             d_phi, d_g,
