@@ -1,11 +1,11 @@
 #include "var.cuh"
 
-int MESH = 128;
+//int MESH = 128;
 
 // extern vars
-int DIAM = ceil(MESH/10);
-int NX = MESH; int NY = MESH; int NZ = MESH*4;  
-float U_JET = 0.1f; 
+int DIAM = 40;
+int NX = 400; int NY = 400; int NZ = 800;  
+float U_JET = 0.05f; 
 
 __constant__ float CSSQ;
 __constant__ float OMEGA;
@@ -28,7 +28,7 @@ float *d_pxy, *d_pxz, *d_pyz, *d_rho, *d_phi;
         const int WEBER = 500;
 // ============================================= //
 
-const float VISC = (U_JET + DIAM) / REYNOLDS;
+const float VISC = (U_JET * DIAM) / REYNOLDS;
 const float H_TAU = 0.5f + 3.0f * VISC;
 const float H_CSSQ = 1.0f / 3.0f;
 const float H_OMEGA = 1.0f / H_TAU;

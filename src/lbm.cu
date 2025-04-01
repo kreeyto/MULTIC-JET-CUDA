@@ -2,7 +2,6 @@
 
 // ================================================================================================== //
 
-/*
 __global__ void phiCalc(
     float * __restrict__ phi,
     const float * __restrict__ g,
@@ -123,8 +122,8 @@ __global__ void curvatureCalc(
     ffy[idx3D] = mult * normy_ * ind_;
     ffz[idx3D] = mult * normz_ * ind_;
 }
-*/
 
+/*
 __global__ void computeInterface(
     float * __restrict__ phi,
     const float * __restrict__ g,
@@ -205,6 +204,7 @@ __global__ void computeInterface(
     ffy[idx] = s_ffy[s_idx];
     ffz[idx] = s_ffz[s_idx];
 }
+*/
 
 // =================================================================================================== //
 
@@ -456,8 +456,8 @@ __global__ void fgBoundary(
     
     if (Ri > DIAM) return;
 
-    //float u_in = U_JET * (1.0f + DATAZ[STEP / MACRO_SAVE] * 10);
-    float u_in = U_JET;
+    float u_in = U_JET * (1.0f + DATAZ[STEP / MACRO_SAVE] * 10);
+    //float u_in = U_JET;
     float phi_in = 0.5f + 0.5f * tanh(2.0f * (DIAM - Ri) / 3.0f);
     
     int idx_in = inline3D(i,j,k,NX,NY);
