@@ -1,10 +1,10 @@
 #include "var.cuh"
 
-//int MESH = 128;
+int MESH = 64;
 
 // extern vars
-int DIAM = 40;
-int NX = 400; int NY = 400; int NZ = 800;  
+int DIAM = ceil(MESH/10);
+int NX = MESH; int NY = MESH; int NZ = MESH*4;  
 float U_JET = 0.05f; 
 
 __constant__ float CSSQ;
@@ -15,7 +15,7 @@ __constant__ float W[NLINKS];
 __constant__ int CIX[NLINKS], CIY[NLINKS], CIZ[NLINKS];
 __constant__ float DATAZ[200];
 
-float *d_f, *d_g;
+float *d_f, *d_g, *d_uz_norm;
 float *d_normx, *d_normy, *d_normz, *d_indicator;
 float *d_curvature, *d_ffx, *d_ffy, *d_ffz;
 float *d_ux, *d_uy, *d_uz, *d_pxx, *d_pyy, *d_pzz;
@@ -110,6 +110,8 @@ void initializeVars() {
     cudaMalloc((void **)&d_pxy, SIZE);
     cudaMalloc((void **)&d_pxz, SIZE);
     cudaMalloc((void **)&d_pyz, SIZE);
+
+    cudaMalloc((void **)&d_uz_norm, SIZE);
 
     cudaMalloc((void **)&d_f, DIST_SIZE);
     cudaMalloc((void **)&d_g, DIST_SIZE );

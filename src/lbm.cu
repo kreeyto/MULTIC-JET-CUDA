@@ -123,89 +123,6 @@ __global__ void curvatureCalc(
     ffz[idx3D] = mult * normz_ * ind_;
 }
 
-/*
-__global__ void computeInterface(
-    float * __restrict__ phi,
-    const float * __restrict__ g,
-    float * __restrict__ ffx,
-    float * __restrict__ ffy,
-    float * __restrict__ ffz,
-    const int NX, const int NY, const int NZ
-) {
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    int j = threadIdx.y + blockIdx.y * blockDim.y;
-    int k = threadIdx.z + blockIdx.z * blockDim.z;
-
-    // local idx
-    int sx = threadIdx.x, sy = threadIdx.y, sz = threadIdx.z;
-
-    if (i >= NX || j >= NY || k >= NZ || i == 0 || i == NX-1 || j == 0 || j == NY-1 || k == 0 || k == NZ-1) return;
-    int idx = inline3D(i,j,k,NX,NY);
-    int s_idx = inline3D(sx,sy,sz,BLOCK_X,BLOCK_Y);
-
-    // shared memory setup
-    __shared__ float s_phi[BLOCK_Z+2][BLOCK_Y+2][BLOCK_X+2];
-    __shared__ float s_normx[BLOCK_Z+2][BLOCK_Y+2][BLOCK_X+2];
-    __shared__ float s_normy[BLOCK_Z+2][BLOCK_Y+2][BLOCK_X+2];
-    __shared__ float s_normz[BLOCK_Z+2][BLOCK_Y+2][BLOCK_X+2];
-    __shared__ float s_ffx[BLOCK_X * BLOCK_Y * BLOCK_Z];
-    __shared__ float s_ffy[BLOCK_X * BLOCK_Y * BLOCK_Z];
-    __shared__ float s_ffz[BLOCK_X * BLOCK_Y * BLOCK_Z];
-
-    // phase field
-    float sum = 0.0f;
-    #pragma unroll 19
-    for (int l = 0; l < NLINKS; ++l) {
-        int idx4D = inline4D(i,j,k,l,NX,NY,NZ);
-        sum += g[idx4D];
-    }
-    s_phi[sz][sy][sx] = sum;
-
-    __syncthreads();
-
-    // gradients and normals
-    float grad_x = 0.0f, grad_y = 0.0f, grad_z = 0.0f;
-    #pragma unroll 19
-    for (int l = 0; l < NLINKS; ++l) {
-        float val = s_phi[sz + CIZ[l]][sy + CIY[l]][sx + CIX[l]];
-        float coef = 3.0f * W[l];
-        grad_x += coef * CIX[l] * val;
-        grad_y += coef * CIY[l] * val;
-        grad_z += coef * CIZ[l] * val;
-    }
-    float gmag_sq = grad_x*grad_x + grad_y*grad_y + grad_z*grad_z;
-    float factor = rsqrtf(fmaxf(gmag_sq, 1e-9));
-
-    s_normx[sz][sy][sx] = grad_x * factor;
-    s_normy[sz][sy][sx] = grad_y * factor;
-    s_normz[sz][sy][sx] = grad_z * factor; 
-    float ind = gmag_sq * factor;  
-
-    __syncthreads();
-
-    float curv = 0.0f;
-    #pragma unroll 19
-    for (int l = 0; l < NLINKS; ++l) {
-        float nox = s_normx[sz + CIZ[l]][sy + CIY[l]][sx + CIX[l]];
-        float noy = s_normy[sz + CIZ[l]][sy + CIY[l]][sx + CIX[l]];
-        float noz = s_normz[sz + CIZ[l]][sy + CIY[l]][sx + CIX[l]];
-        float coef = 3.0f * W[l];
-        curv -= coef * (CIX[l] * nox + CIY[l] * noy + CIZ[l] * noz);
-    }
-    float mult = SIGMA * curv;
-    s_ffx[s_idx] = mult * s_normx[sz][sy][sx] * ind;
-    s_ffy[s_idx] = mult * s_normy[sz][sy][sx] * ind;
-    s_ffz[s_idx] = mult * s_normz[sz][sy][sx] * ind;
-
-    __syncthreads();
-
-    phi[idx] = s_phi[sz][sy][sx];
-    ffx[idx] = s_ffx[s_idx];
-    ffy[idx] = s_ffy[s_idx];
-    ffz[idx] = s_ffz[s_idx];
-}
-*/
-
 // =================================================================================================== //
 
 
@@ -456,8 +373,7 @@ __global__ void fgBoundary(
     
     if (Ri > DIAM) return;
 
-    float u_in = U_JET * (1.0f + DATAZ[STEP / MACRO_SAVE] * 10);
-    //float u_in = U_JET;
+    float u_in = U_JET; //* (1.0f + DATAZ[STEP / MACRO_SAVE]);
     float phi_in = 0.5f + 0.5f * tanh(2.0f * (DIAM - Ri) / 3.0f);
     
     int idx_in = inline3D(i,j,k,NX,NY);
@@ -523,3 +439,21 @@ __global__ void fgBoundary(
 
 // =================================================================================================== //
 
+
+
+// =================================================================================================== //
+__global__ void normalizeUz(
+    const float * __restrict__ uz,
+    float * __restrict__ uz_norm,
+    const float U_JET,
+    const int NX, const int NY, const int NZ
+) {
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int j = threadIdx.y + blockIdx.y * blockDim.y;
+    int k = threadIdx.z + blockIdx.z * blockDim.z;
+
+    if (i >= NX || j >= NY || k >= NZ) return;
+
+    int idx = i + j * NX + k * NX * NY;
+    uz_norm[idx] = uz[idx] / U_JET;
+}

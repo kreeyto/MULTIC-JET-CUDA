@@ -66,15 +66,16 @@ int main(int argc, char* argv[]) {
     // ========================================= //
 
     vector<float> phi_host(NX * NY * NZ);
+    vector<float> uz_host(NX * NY * NZ);
+    vector<float> uz_norm_host(NX * NY * NZ);
 
     /*
     size_t shared_3D_size = (BLOCK_X+2 * BLOCK_Y+2 * BLOCK_Z+2) * sizeof(float); 
     size_t shared_1D_size = (BLOCK_X * BLOCK_Y * BLOCK_Z) * sizeof(float);
     size_t num_3D_sh = 4 * shared_3D_size;
     size_t num_1D_sh = 3 * shared_1D_size;
-    */
-
     size_t total_shared = num_3D_sh + num_1D_sh;
+    */
 
     for (int STEP = 0; STEP <= NSTEPS ; ++STEP) {
         cout << "Passo " << STEP << " de " << NSTEPS << " iniciado..." << endl;
@@ -111,13 +112,7 @@ int main(int argc, char* argv[]) {
             
         // =================================================== //   
 
-        /*
-        computeInterface<<<numBlocks, threadsPerBlock, total_shared, mainStream>>> (
-            d_phi, d_g,
-            d_ffx, d_ffy, d_ffz,
-            NX, NY, NZ
-        );
-        */
+
         
         // ===================== MOMENTI ===================== //
 
@@ -168,11 +163,16 @@ int main(int argc, char* argv[]) {
 
         // ================================================================================================= //
 
+        normalizeUz<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
+            d_uz, d_uz_norm, U_JET, NX, NY, NZ
+        );
+
         cudaDeviceSynchronize();
 
         if (STEP % MACRO_SAVE == 0) {
 
             copyAndSaveToBinary(d_phi, NX * NY * NZ, SIM_DIR, ID, STEP, "phi");
+            copyAndSaveToBinary(d_uz_norm, NX * NY * NZ, SIM_DIR, ID, STEP, "uz_norm");
 
             cout << "Passo " << STEP << ": Dados salvos em " << SIM_DIR << endl;
         }
@@ -182,12 +182,12 @@ int main(int argc, char* argv[]) {
     cudaStreamDestroy(collFluid);
     cudaStreamDestroy(collPhase);
 
-    float *pointers[] = {d_f, d_g, d_phi, d_rho, 
+    float *pointers[] = {d_f, d_g, d_phi, d_rho, d_uz_norm, 
                           d_normx, d_normy, d_normz, d_indicator,
                           d_curvature, d_ffx, d_ffy, d_ffz, d_ux, d_uy, d_uz,
                           d_pxx, d_pyy, d_pzz, d_pxy, d_pxz, d_pyz
                         };
-    freeMemory(pointers, 21);  
+    freeMemory(pointers, 22);  
 
     auto END_TIME = chrono::high_resolution_clock::now();
     chrono::duration<double> ELAPSED_TIME = END_TIME - START_TIME;

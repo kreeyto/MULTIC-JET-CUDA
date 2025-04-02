@@ -51,17 +51,6 @@ __global__ void curvatureCalc(
     const int NX, const int NY, const int NZ
 );
 
-/*
-__global__ void computeInterface(
-    float * __restrict__ phi,
-    const float * __restrict__ g,
-    float * __restrict__ ffx,
-    float * __restrict__ ffy,
-    float * __restrict__ ffz,
-    const int NX, const int NY, const int NZ
-);
-*/
-
 __global__ void momentiCalc(
     float * __restrict__ ux,
     float * __restrict__ uy,
@@ -127,6 +116,13 @@ __global__ void fgBoundary(
     const float U_MAX, const int D_HALF,
     const int NX, const int NY, const int NZ,
     const int STEP, const int MACRO_SAVE
+);
+
+__global__ void normalizeUz(
+    const float * __restrict__ uz,
+    float * __restrict__ uz_norm,
+    const float U_JET,
+    const int NX, const int NY, const int NZ
 );
 
 #endif
