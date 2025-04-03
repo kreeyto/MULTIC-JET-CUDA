@@ -67,7 +67,6 @@ int main(int argc, char* argv[]) {
 
     vector<float> phi_host(NX * NY * NZ);
     vector<float> uz_host(NX * NY * NZ);
-    vector<float> uz_norm_host(NX * NY * NZ);
 
     /*
     size_t shared_3D_size = (BLOCK_X+2 * BLOCK_Y+2 * BLOCK_Z+2) * sizeof(float); 
@@ -163,16 +162,12 @@ int main(int argc, char* argv[]) {
 
         // ================================================================================================= //
 
-        normalizeUz<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
-            d_uz, d_uz_norm, U_JET, NX, NY, NZ
-        );
-
         cudaDeviceSynchronize();
 
         if (STEP % MACRO_SAVE == 0) {
 
             copyAndSaveToBinary(d_phi, NX * NY * NZ, SIM_DIR, ID, STEP, "phi");
-            copyAndSaveToBinary(d_uz_norm, NX * NY * NZ, SIM_DIR, ID, STEP, "uz_norm");
+            copyAndSaveToBinary(d_uz, NX * NY * NZ, SIM_DIR, ID, STEP, "uz");
 
             cout << "Passo " << STEP << ": Dados salvos em " << SIM_DIR << endl;
         }
@@ -182,12 +177,12 @@ int main(int argc, char* argv[]) {
     cudaStreamDestroy(collFluid);
     cudaStreamDestroy(collPhase);
 
-    float *pointers[] = {d_f, d_g, d_phi, d_rho, d_uz_norm, 
+    float *pointers[] = {d_f, d_g, d_phi, d_rho,
                           d_normx, d_normy, d_normz, d_indicator,
                           d_curvature, d_ffx, d_ffy, d_ffz, d_ux, d_uy, d_uz,
                           d_pxx, d_pyy, d_pzz, d_pxy, d_pxz, d_pyz
                         };
-    freeMemory(pointers, 22);  
+    freeMemory(pointers, 21);  
 
     auto END_TIME = chrono::high_resolution_clock::now();
     chrono::duration<double> ELAPSED_TIME = END_TIME - START_TIME;

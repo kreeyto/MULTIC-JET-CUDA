@@ -118,11 +118,4 @@ __global__ void fgBoundary(
     const int STEP, const int MACRO_SAVE
 );
 
-__global__ void normalizeUz(
-    const float * __restrict__ uz,
-    float * __restrict__ uz_norm,
-    const float U_JET,
-    const int NX, const int NY, const int NZ
-);
-
 #endif

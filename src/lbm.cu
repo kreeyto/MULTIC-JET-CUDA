@@ -369,12 +369,12 @@ __global__ void fgBoundary(
 
     float dx = i - cx;
     float dy = j - cy;
-    float Ri = sqrt(dx*dx + dy*dy);
+    float Ri = sqrtf(dx*dx + dy*dy);
     
     if (Ri > DIAM) return;
 
-    float u_in = U_JET; //* (1.0f + DATAZ[STEP / MACRO_SAVE]);
-    float phi_in = 0.5f + 0.5f * tanh(2.0f * (DIAM - Ri) / 3.0f);
+    float u_in = U_JET; //* (1.0f + DATAZ[STEP / MACRO_SAVE] * 10);
+    float phi_in = 0.5f + 0.5f * tanhf(2.0f * (DIAM - Ri) / 3.0f);
     
     int idx_in = inline3D(i,j,k,NX,NY);
 
@@ -439,21 +439,3 @@ __global__ void fgBoundary(
 
 // =================================================================================================== //
 
-
-
-// =================================================================================================== //
-__global__ void normalizeUz(
-    const float * __restrict__ uz,
-    float * __restrict__ uz_norm,
-    const float U_JET,
-    const int NX, const int NY, const int NZ
-) {
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    int j = threadIdx.y + blockIdx.y * blockDim.y;
-    int k = threadIdx.z + blockIdx.z * blockDim.z;
-
-    if (i >= NX || j >= NY || k >= NZ) return;
-
-    int idx = i + j * NX + k * NX * NY;
-    uz_norm[idx] = uz[idx] / U_JET;
-}
