@@ -32,7 +32,7 @@ const float VISC = (U_JET * DIAM) / REYNOLDS;
 const float H_TAU = 0.5f + 3.0f * VISC;
 const float H_CSSQ = 1.0f / 3.0f;
 const float H_OMEGA = 1.0f / H_TAU;
-const float H_SHARP_C = 0.15f * 3.0f;
+const float H_SHARP_C = 0.15f * 4.0f;
 const float H_SIGMA = (U_JET * U_JET * DIAM) / WEBER;
 
 // velocity set

@@ -348,9 +348,6 @@ __global__ void fgBoundary(
     float * __restrict__ uz,
     float * __restrict__ f,
     float * __restrict__ g,
-    const float * __restrict__ normx,
-    const float * __restrict__ normy,
-    const float * __restrict__ normz,
     const float * __restrict__ ffx,
     const float * __restrict__ ffy,
     const float * __restrict__ ffz,
@@ -373,8 +370,7 @@ __global__ void fgBoundary(
     
     if (Ri > DIAM) return;
 
-    float u_in = U_JET; //* (1.0f + DATAZ[STEP / MACRO_SAVE] * 10);
-    float phi_in = 0.5f + 0.5f * tanhf(2.0f * (DIAM - Ri) / 3.0f);
+    float u_in = U_JET; //* (1.0f + DATAZ[STEP / MACRO_SAVE] * 100);
     
     int idx_in = inline3D(i,j,k,NX,NY);
 
@@ -383,17 +379,16 @@ __global__ void fgBoundary(
     float ffz_val = ffz[idx_in];
 
     rho[idx_in] = 1.0f;
-    phi[idx_in] = phi_in;
+    phi[idx_in] = 1.0f;
     ux[idx_in] = 0.0f;
     uy[idx_in] = 0.0f;
-    uz[idx_in] = u_in * phi_in; 
+    uz[idx_in] = u_in; 
 
     float uz_val = uz[idx_in]; 
     float rho_val = rho[idx_in];
 
     float uu = 0.5f * (uz_val * uz_val) / CSSQ;
     float invRhoCssq = 1.0f / (rho_val * CSSQ);
-
     float auxHe = 1.0f - OMEGA / 2.0f;  
 
     #pragma unroll 19
@@ -421,8 +416,6 @@ __global__ void fgBoundary(
     for (int l = 0; l < NLINKS; ++l) {
         float udotc = (uz_val * CIZ[l]) / CSSQ;
         float geq = W[l] * phi[idx_in] * (1.0f + udotc);
-        float Hi = W[l] * SHARP_C * phi[idx_in] * (1.0f - phi[idx_in]) *
-                    (CIX[l] * normx[idx_in] + CIY[l] * normy[idx_in] + CIZ[l] * normz[idx_in]);
 
         int i_new = i + CIX[l];
         int j_new = j + CIY[l];
@@ -432,7 +425,7 @@ __global__ void fgBoundary(
             j_new >= 0 && j_new < NY &&
             k_new >= 0 && k_new < NZ) {
             int idx_g = inline4D(i_new,j_new,k_new,l,NX,NY,NZ);
-            g[idx_g] = geq + Hi;
+            g[idx_g] = geq;
         }
     }
 }
