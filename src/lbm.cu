@@ -72,12 +72,11 @@ __global__ void gradCalc(
 
 // =================================================================================================== //
 
-
+// UNIR KERNELS ACIMA E ABAIXO!!!!!! PRA ONTEM
 
 // =================================================================================================== //
 
 __global__ void curvatureCalc(
-    float * __restrict__ curvature,
     const float * __restrict__ indicator,
     const float * __restrict__ normx,
     const float * __restrict__ normy,
@@ -117,7 +116,6 @@ __global__ void curvatureCalc(
 
     float mult = SIGMA * curv;
 
-    curvature[idx3D] = curv;
     ffx[idx3D] = mult * normx_ * ind_;
     ffy[idx3D] = mult * normy_ * ind_;
     ffz[idx3D] = mult * normz_ * ind_;
@@ -299,6 +297,12 @@ __global__ void collisionPhase(
     const float * __restrict__ normx,
     const float * __restrict__ normy,
     const float * __restrict__ normz,
+    const float * __restrict__ pxx,
+    const float * __restrict__ pyy,
+    const float * __restrict__ pzz,
+    const float * __restrict__ pxy,
+    const float * __restrict__ pxz,
+    const float * __restrict__ pyz,
     const int NX, const int NY, const int NZ
 ) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -316,7 +320,10 @@ __global__ void collisionPhase(
     float normx_val = normx[idx3D]; 
     float normy_val = normy[idx3D];
     float normz_val = normz[idx3D];
+    float pxx_val = pxx[idx3D], pyy_val = pyy[idx3D], pzz_val = pzz[idx3D];
+    float pxy_val = pxy[idx3D], pxz_val = pxz[idx3D], pyz_val = pyz[idx3D];
 
+    float uu = 0.5f * (ux_val*ux_val + uy_val*uy_val + uz_val*uz_val) / CSSQ;
     float invCSSQ = 1.0f / CSSQ;
 
     float phi_norm = SHARP_C * phi_val * (1.0f - phi_val);
@@ -327,10 +334,17 @@ __global__ void collisionPhase(
         int kk = k + CIZ[l];
         
         float udotc = (ux_val * CIX[l] + uy_val * CIY[l] + uz_val * CIZ[l]) * invCSSQ;
-        float geq = W[l] * phi_val * (1.0f + udotc);
+        float geq = W[l] * (phi_val + phi_val * (udotc + 0.5f * udotc*udotc - uu));
         float Hi = W[l] * phi_norm * (CIX[l] * normx_val + CIY[l] * normy_val + CIZ[l] * normz_val);
+        float gneq = (W[l] / (2.0f * CSSQ * CSSQ)) * ((CIX[l]*CIX[l] - CSSQ) * pxx_val +
+                                                      (CIY[l]*CIY[l] - CSSQ) * pyy_val +
+                                                      (CIZ[l]*CIZ[l] - CSSQ) * pzz_val +
+                                                       2.0f * CIX[l] * CIY[l] * pxy_val +
+                                                       2.0f * CIX[l] * CIZ[l] * pxz_val +
+                                                       2.0f * CIY[l] * CIZ[l] * pyz_val
+                                                    );
         int offset = inline4D(ii,jj,kk,l,NX,NY,NZ);
-        g[offset] = geq + Hi;
+        g[offset] = geq + (1.0f - OMEGA) * gneq + Hi;
     }
 }
 
@@ -352,8 +366,8 @@ __global__ void fgBoundary(
     const float * __restrict__ ffy,
     const float * __restrict__ ffz,
     const float U_JET, const int DIAM,
-    const int NX, const int NY, const int NZ,
-    const int STEP, const int MACRO_SAVE
+    const int NX, const int NY, const int NZ
+    //const int STEP, const int MACRO_SAVE
 ) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     int j = threadIdx.y + blockIdx.y * blockDim.y;
@@ -415,7 +429,7 @@ __global__ void fgBoundary(
     #pragma unroll 19
     for (int l = 0; l < NLINKS; ++l) {
         float udotc = (uz_val * CIZ[l]) / CSSQ;
-        float geq = W[l] * phi[idx_in] * (1.0f + udotc);
+        float geq = W[l] * (1.0f + (udotc + 0.5f * udotc*udotc - uu));
 
         int i_new = i + CIX[l];
         int j_new = j + CIY[l];

@@ -9,7 +9,7 @@ extern float U_JET;
 extern __constant__ float CSSQ, OMEGA, SHARP_C, SIGMA;
 extern __constant__ float W[NLINKS];
 extern __constant__ int CIX[NLINKS], CIY[NLINKS], CIZ[NLINKS];
-extern __constant__ float DATAZ[200];
+//extern __constant__ float DATAZ[200];
  
 extern float *d_f, *d_g;
 extern float *d_normx, *d_normy, *d_normz, *d_indicator;

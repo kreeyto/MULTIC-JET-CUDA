@@ -68,13 +68,8 @@ int main(int argc, char* argv[]) {
     vector<float> phi_host(NX * NY * NZ);
     vector<float> uz_host(NX * NY * NZ);
 
-    /*
-    size_t shared_3D_size = (BLOCK_X+2 * BLOCK_Y+2 * BLOCK_Z+2) * sizeof(float); 
-    size_t shared_1D_size = (BLOCK_X * BLOCK_Y * BLOCK_Z) * sizeof(float);
-    size_t num_3D_sh = 4 * shared_3D_size;
-    size_t num_1D_sh = 3 * shared_1D_size;
-    size_t total_shared = num_3D_sh + num_1D_sh;
-    */
+    int nThreads = 8 * 8 * 8;
+    size_t shmemSize = sizeof(float) * nThreads * 5;
 
     for (int STEP = 0; STEP <= NSTEPS ; ++STEP) {
         cout << "Passo " << STEP << " de " << NSTEPS << " iniciado..." << endl;
@@ -103,8 +98,7 @@ int main(int argc, char* argv[]) {
         // ==================== CURVATURE ==================== //
 
             curvatureCalc<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
-                d_curvature, d_indicator,
-                d_normx, d_normy, d_normz, 
+                d_indicator, d_normx, d_normy, d_normz, 
                 d_ffx, d_ffy, d_ffz,
                 NX, NY, NZ
             ); 
@@ -139,6 +133,8 @@ int main(int argc, char* argv[]) {
             collisionPhase<<<numBlocks, threadsPerBlock, 0, collPhase>>> (
                 d_g, d_ux, d_uy, d_uz, 
                 d_phi, d_normx, d_normy, d_normz, 
+                d_pxx, d_pyy, d_pzz,
+                d_pxy, d_pxz, d_pyz,
                 NX, NY, NZ
             ); 
 
@@ -155,8 +151,8 @@ int main(int argc, char* argv[]) {
                 d_ux, d_uy, d_uz, d_f, d_g, 
                 d_ffx, d_ffy, d_ffz,
                 U_JET, DIAM,
-                NX, NY, NZ,
-                STEP, MACRO_SAVE
+                NX, NY, NZ
+                //STEP, MACRO_SAVE
             ); 
 
         // ============================================================================================= //

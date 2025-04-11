@@ -30,6 +30,12 @@ __global__ void phiCalc(
     const int NX, const int NY, const int NZ
 );
 
+__global__ void muCalc(
+    float * __restrict__ mu,
+    const float * __restrict__ phi,
+    const int NX, const int NY, const int NZ
+);
+
 __global__ void gradCalc(
     const float * __restrict__ phi,
     float * __restrict__ normx,
@@ -40,7 +46,6 @@ __global__ void gradCalc(
 );
 
 __global__ void curvatureCalc(
-    float * __restrict__ curvature,
     const float * __restrict__ indicator,
     const float * __restrict__ normx,
     const float * __restrict__ normy,
@@ -96,6 +101,12 @@ __global__ void collisionPhase(
     const float * __restrict__ normx,
     const float * __restrict__ normy,
     const float * __restrict__ normz,
+    const float * __restrict__ pxx,
+    const float * __restrict__ pyy,
+    const float * __restrict__ pzz,
+    const float * __restrict__ pxy,
+    const float * __restrict__ pxz,
+    const float * __restrict__ pyz,
     const int NX, const int NY, const int NZ
 );
 
@@ -111,8 +122,8 @@ __global__ void fgBoundary(
     const float * __restrict__ ffy,
     const float * __restrict__ ffz,
     const float U_MAX, const int D_HALF,
-    const int NX, const int NY, const int NZ,
-    const int STEP, const int MACRO_SAVE
+    const int NX, const int NY, const int NZ
+    //const int STEP, const int MACRO_SAVE
 );
 
 #endif

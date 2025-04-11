@@ -13,11 +13,11 @@ __constant__ float SHARP_C;
 __constant__ float SIGMA;
 __constant__ float W[NLINKS];
 __constant__ int CIX[NLINKS], CIY[NLINKS], CIZ[NLINKS];
-__constant__ float DATAZ[200];
+//__constant__ float DATAZ[200];
 
 float *d_f, *d_g;
 float *d_normx, *d_normy, *d_normz, *d_indicator;
-float *d_curvature, *d_ffx, *d_ffy, *d_ffz;
+float *d_ffx, *d_ffy, *d_ffz;
 float *d_ux, *d_uy, *d_uz, *d_pxx, *d_pyy, *d_pzz;
 float *d_pxy, *d_pxz, *d_pyz, *d_rho, *d_phi;
 
@@ -32,7 +32,7 @@ const float VISC = (U_JET * DIAM) / REYNOLDS;
 const float H_TAU = 0.5f + 3.0f * VISC;
 const float H_CSSQ = 1.0f / 3.0f;
 const float H_OMEGA = 1.0f / H_TAU;
-const float H_SHARP_C = 0.15f * 4.0f;
+const float H_SHARP_C = 0.15f * 3.0f;
 const float H_SIGMA = (U_JET * U_JET * DIAM) / WEBER;
 
 // velocity set
@@ -64,7 +64,7 @@ const float H_SIGMA = (U_JET * U_JET * DIAM) / WEBER;
 #endif
 
 // perturbation
-float H_DATAZ[200] = { 0.00079383f, 0.00081679f, 0.00002621f, -0.00002419f, -0.00044200f, -0.00084266f, 0.00048380f, 0.00021733f, 0.00032251f, 0.00001137f, 
+/*float H_DATAZ[200] = { 0.00079383f, 0.00081679f, 0.00002621f, -0.00002419f, -0.00044200f, -0.00084266f, 0.00048380f, 0.00021733f, 0.00032251f, 0.00001137f, 
                       -0.00050303f, -0.00008389f, 0.00000994f, -0.00061235f, 0.00092132f, 0.00001801f, 0.00064784f, -0.00013657f, 0.00051558f, 0.00020564f, 
                       -0.00074830f, -0.00094143f, -0.00052143f, 0.00073746f, 0.00024430f, 0.00036541f, -0.00014634f, -0.00034321f, 0.00013730f, 0.00005668f, 
                        0.00034116f, -0.00098297f, 0.00007028f, 0.00042728f, -0.00086542f, -0.00059119f, 0.00059534f, 0.00026490f, -0.00007748f, -0.00054852f, 
@@ -83,7 +83,7 @@ float H_DATAZ[200] = { 0.00079383f, 0.00081679f, 0.00002621f, -0.00002419f, -0.0
                        0.00021581f, 0.00074161f, 0.00051495f, 0.00059711f, -0.00084965f, 0.00025144f, -0.00067714f, 0.00053914f, 0.00018297f, 0.00090897f, 
                        0.00011948f, -0.00092672f, -0.00064307f, -0.00032715f, -0.00040575f, -0.00044485f, 0.00028828f, -0.00099615f, -0.00017845f, 0.00052521f, 
                       -0.00045545f, 0.00011635f, 0.00093167f, 0.00062180f, -0.00010542f, 0.00085383f, -0.00048304f, -0.00042307f, 0.00085464f, 0.00005302f, 
-                      -0.00070889f, 0.00045034f, 0.00002412f, -0.00016850f, 0.00014029f, 0.00036591f, -0.00049267f, 0.00049268f, -0.00012600f, -0.00017574f };
+                      -0.00070889f, 0.00045034f, 0.00002412f, -0.00016850f, 0.00014029f, 0.00036591f, -0.00049267f, 0.00049268f, -0.00012600f, -0.00017574f };*/
                                          
 // =============================================================================================================================================================== //
 
@@ -99,7 +99,6 @@ void initializeVars() {
     cudaMalloc((void **)&d_normx, SIZE);
     cudaMalloc((void **)&d_normy, SIZE);
     cudaMalloc((void **)&d_normz, SIZE);
-    cudaMalloc((void **)&d_curvature, SIZE);
     cudaMalloc((void **)&d_indicator, SIZE);
     cudaMalloc((void **)&d_ffx, SIZE);
     cudaMalloc((void **)&d_ffy, SIZE);
@@ -125,7 +124,6 @@ void initializeVars() {
     cudaMemset(d_normx, 0, SIZE);
     cudaMemset(d_normy, 0, SIZE);
     cudaMemset(d_normz, 0, SIZE);
-    cudaMemset(d_curvature, 0, SIZE);
     cudaMemset(d_indicator, 0, SIZE);
     cudaMemset(d_ffx, 0, SIZE);
     cudaMemset(d_ffy, 0, SIZE);
@@ -142,7 +140,6 @@ void initializeVars() {
     cudaMemcpyToSymbol(CIY, &H_CIY, NLINKS * sizeof(int));
     cudaMemcpyToSymbol(CIZ, &H_CIZ, NLINKS * sizeof(int));
 
-    cudaMemcpyToSymbol(DATAZ, &H_DATAZ, 200 * sizeof(float));
-
+    //cudaMemcpyToSymbol(DATAZ, &H_DATAZ, 200 * sizeof(float));
 }
 
