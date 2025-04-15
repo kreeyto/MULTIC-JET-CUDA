@@ -68,8 +68,8 @@ int main(int argc, char* argv[]) {
     vector<float> phi_host(NX * NY * NZ);
     vector<float> uz_host(NX * NY * NZ);
 
-    int nThreads = 8 * 8 * 8;
-    size_t shmemSize = sizeof(float) * nThreads * 5;
+    //int nThreads = 8 * 8 * 8;
+    //size_t shmemSize = sizeof(float) * nThreads * 5;
 
     for (int STEP = 0; STEP <= NSTEPS ; ++STEP) {
         cout << "Passo " << STEP << " de " << NSTEPS << " iniciado..." << endl;
@@ -133,8 +133,6 @@ int main(int argc, char* argv[]) {
             collisionPhase<<<numBlocks, threadsPerBlock, 0, collPhase>>> (
                 d_g, d_ux, d_uy, d_uz, 
                 d_phi, d_normx, d_normy, d_normz, 
-                d_pxx, d_pyy, d_pzz,
-                d_pxy, d_pxz, d_pyz,
                 NX, NY, NZ
             ); 
 
@@ -174,10 +172,10 @@ int main(int argc, char* argv[]) {
 
     float *pointers[] = {d_f, d_g, d_phi, d_rho,
                           d_normx, d_normy, d_normz, d_indicator,
-                          d_curvature, d_ffx, d_ffy, d_ffz, d_ux, d_uy, d_uz,
+                          d_ffx, d_ffy, d_ffz, d_ux, d_uy, d_uz,
                           d_pxx, d_pyy, d_pzz, d_pxy, d_pxz, d_pyz
                         };
-    freeMemory(pointers, 21);  
+    freeMemory(pointers, 20);  
 
     auto END_TIME = chrono::high_resolution_clock::now();
     chrono::duration<double> ELAPSED_TIME = END_TIME - START_TIME;
