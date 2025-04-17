@@ -18,8 +18,8 @@ __constant__ int CIX[NLINKS], CIY[NLINKS], CIZ[NLINKS];
 float *d_f, *d_g;
 float *d_normx, *d_normy, *d_normz, *d_indicator;
 float *d_ffx, *d_ffy, *d_ffz;
-float *d_ux, *d_uy, *d_uz, *d_pxx, *d_pyy, *d_pzz;
-float *d_pxy, *d_pxz, *d_pyz, *d_rho, *d_phi;
+float *d_ux, *d_uy, *d_uz;
+float *d_rho, *d_phi;
 
 // ========================================================================== parametros ========================================================================== //
 
@@ -103,31 +103,11 @@ void initializeVars() {
     cudaMalloc((void **)&d_ffx, SIZE);
     cudaMalloc((void **)&d_ffy, SIZE);
     cudaMalloc((void **)&d_ffz, SIZE);
-    cudaMalloc((void **)&d_pxx, SIZE);
-    cudaMalloc((void **)&d_pyy, SIZE);
-    cudaMalloc((void **)&d_pzz, SIZE);
-    cudaMalloc((void **)&d_pxy, SIZE);
-    cudaMalloc((void **)&d_pxz, SIZE);
-    cudaMalloc((void **)&d_pyz, SIZE);
 
     cudaMalloc((void **)&d_f, DIST_SIZE);
-    cudaMalloc((void **)&d_g, DIST_SIZE );
+    cudaMalloc((void **)&d_g, DIST_SIZE);
 
-    cudaMemset(d_phi, 0, SIZE);
-    cudaMemset(d_ux, 0, SIZE);
-    cudaMemset(d_uy, 0, SIZE);
-    cudaMemset(d_uz, 0, SIZE);
-    
-    cudaMemset(d_f, 0, DIST_SIZE );
-    cudaMemset(d_g, 0, DIST_SIZE );
-
-    cudaMemset(d_normx, 0, SIZE);
-    cudaMemset(d_normy, 0, SIZE);
-    cudaMemset(d_normz, 0, SIZE);
-    cudaMemset(d_indicator, 0, SIZE);
-    cudaMemset(d_ffx, 0, SIZE);
-    cudaMemset(d_ffy, 0, SIZE);
-    cudaMemset(d_ffz, 0, SIZE);
+    cudaMemset(d_g, 0, DIST_SIZE);
 
     cudaMemcpyToSymbol(CSSQ, &H_CSSQ, sizeof(float));
     cudaMemcpyToSymbol(OMEGA, &H_OMEGA, sizeof(float));

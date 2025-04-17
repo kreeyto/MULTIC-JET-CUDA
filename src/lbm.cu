@@ -2,7 +2,7 @@
 
 // ================================================================================================== //
 
-__global__ void phiCalc(
+__global__ void gpuPhaseField(
     float * __restrict__ phi,
     const float * __restrict__ g,
     const int NX, const int NY, const int NZ
@@ -16,11 +16,13 @@ __global__ void phiCalc(
     int idx = inline3D(i,j,k,NX,NY);
 
     float phi_local = 0.0f;
+
     #pragma unroll 19
     for (int l = 0; l < NLINKS; ++l) {
         int idx4D = inline4D(i,j,k,l,NX,NY,NZ);
         phi_local += g[idx4D];
     }
+
     phi[idx] = phi_local;
 }
 
@@ -30,7 +32,7 @@ __global__ void phiCalc(
 
 // =================================================================================================== //
 
-__global__ void gradCalc(
+__global__ void gpuGradients(
     const float * __restrict__ phi,
     float * __restrict__ normx,
     float * __restrict__ normy,
@@ -76,7 +78,7 @@ __global__ void gradCalc(
 
 // =================================================================================================== //
 
-__global__ void curvatureCalc(
+__global__ void gpuCurvature(
     const float * __restrict__ indicator,
     const float * __restrict__ normx,
     const float * __restrict__ normy,
@@ -127,7 +129,7 @@ __global__ void curvatureCalc(
 
 // =================================================================================================== //
 
-__global__ void momentiCalc(
+__global__ void gpuMomCollisionStream(
     float * __restrict__ ux,
     float * __restrict__ uy,
     float * __restrict__ uz,
@@ -135,13 +137,7 @@ __global__ void momentiCalc(
     const float * __restrict__ ffx,
     const float * __restrict__ ffy,
     const float * __restrict__ ffz,
-    const float * __restrict__ f,
-    float * __restrict__ pxx,
-    float * __restrict__ pyy,
-    float * __restrict__ pzz,
-    float * __restrict__ pxy,
-    float * __restrict__ pxz,
-    float * __restrict__ pyz,
+    float * __restrict__ f,
     const int NX, const int NY, const int NZ
 ) {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
@@ -188,11 +184,8 @@ __global__ void momentiCalc(
     float uyVal = sumUy + halfFy;
     float uzVal = sumUz + halfFz;
 
-    float uu = 1.5f * (uxVal * uxVal + uyVal * uyVal + uzVal * uzVal);
+    float uu = 1.5f * (uxVal*uxVal + uyVal*uyVal + uzVal*uzVal);
     float invRhoCssq = 3.0f / rhoVal;
-
-    float sumXX = 0.0f, sumYY = 0.0f, sumZZ = 0.0f;
-    float sumXY = 0.0f, sumXZ = 0.0f, sumYZ = 0.0f;
 
     float auxHe = 1.0f - OMEGA / 2.0f;
 
@@ -208,59 +201,14 @@ __global__ void momentiCalc(
         fneq[l] = fVal[l] - feq;
     }
 
-    sumXX = fneq[1] + fneq[2] + fneq[7] + fneq[8] + fneq[9] + fneq[10] + fneq[13] + fneq[14] + fneq[15] + fneq[16];
-    sumYY = fneq[3] + fneq[4] + fneq[7] + fneq[8] + fneq[11] + fneq[12] + fneq[13] + fneq[14] + fneq[17] + fneq[18];
-    sumZZ = fneq[5] + fneq[6] + fneq[9] + fneq[10] + fneq[11] + fneq[12] + fneq[15] + fneq[16] + fneq[17] + fneq[18];
-    sumXY = fneq[7] - fneq[13] + fneq[8] - fneq[14];
-    sumXZ = fneq[9] - fneq[15] + fneq[10] - fneq[16];
-    sumYZ = fneq[11] - fneq[17] + fneq[12] - fneq[18];
-
-    pxx[idx3D] = sumXX; pyy[idx3D] = sumYY; pzz[idx3D] = sumZZ;
-    pxy[idx3D] = sumXY; pxz[idx3D] = sumXZ; pyz[idx3D] = sumYZ;
+    float PXX = fneq[1] + fneq[2] + fneq[7] + fneq[8] + fneq[9] + fneq[10] + fneq[13] + fneq[14] + fneq[15] + fneq[16];
+    float PYY = fneq[3] + fneq[4] + fneq[7] + fneq[8] + fneq[11] + fneq[12] + fneq[13] + fneq[14] + fneq[17] + fneq[18];
+    float PZZ = fneq[5] + fneq[6] + fneq[9] + fneq[10] + fneq[11] + fneq[12] + fneq[15] + fneq[16] + fneq[17] + fneq[18];
+    float PXY = fneq[7] - fneq[13] + fneq[8] - fneq[14];
+    float PXZ = fneq[9] - fneq[15] + fneq[10] - fneq[16];
+    float PYZ = fneq[11] - fneq[17] + fneq[12] - fneq[18];
 
     ux[idx3D] = uxVal; uy[idx3D] = uyVal; uz[idx3D] = uzVal;
-    rho[idx3D] = rhoVal;
-}
-
-// =================================================================================================== //
-
-
-
-// =================================================================================================== //
-
-__global__ void collisionFluid(
-    float * __restrict__ f,
-    const float * __restrict__ ux,
-    const float * __restrict__ uy,
-    const float * __restrict__ uz,
-    const float * __restrict__ ffx,
-    const float * __restrict__ ffy,
-    const float * __restrict__ ffz,
-    const float * __restrict__ rho,
-    const float * __restrict__ pxx,
-    const float * __restrict__ pyy,
-    const float * __restrict__ pzz,
-    const float * __restrict__ pxy,
-    const float * __restrict__ pxz,
-    const float * __restrict__ pyz,
-    const int NX, const int NY, const int NZ
-) {
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    int j = threadIdx.y + blockIdx.y * blockDim.y;
-    int k = threadIdx.z + blockIdx.z * blockDim.z;
-
-    if (i >= NX || j >= NY || k >= NZ || i == 0 || i == NX-1 || j == 0 || j == NY-1 || k == 0 || k == NZ-1) return;
-
-    int idx3D = inline3D(i,j,k,NX,NY);
-
-    float ux_val = ux[idx3D], uy_val = uy[idx3D], uz_val = uz[idx3D], rho_val = rho[idx3D];
-    float ffx_val = ffx[idx3D], ffy_val = ffy[idx3D], ffz_val = ffz[idx3D];
-    float pxx_val = pxx[idx3D], pyy_val = pyy[idx3D], pzz_val = pzz[idx3D];
-    float pxy_val = pxy[idx3D], pxz_val = pxz[idx3D], pyz_val = pyz[idx3D];
-
-    float uu = 1.5f * (ux_val*ux_val + uy_val*uy_val + uz_val*uz_val);
-    float invRhoCssq = 3.0f / rho_val;
-    float auxHe = 1.0f - OMEGA / 2.0f;
 
     #pragma unroll 19
     for (int l = 0; l < NLINKS; ++l) {
@@ -268,24 +216,24 @@ __global__ void collisionFluid(
         int jj = j + CIY[l]; 
         int kk = k + CIZ[l];
         
-        float cu = 3.0f * (ux_val * CIX[l] + uy_val * CIY[l] + uz_val * CIZ[l]);
-        float feq = W[l] * (rho_val + rho_val * (cu + 0.5f * cu*cu - uu));
-        float HeF = auxHe * feq * ( (CIX[l] - ux_val) * ffx_val +
-                                    (CIY[l] - uy_val) * ffy_val +
-                                    (CIZ[l] - uz_val) * ffz_val ) * invRhoCssq;
-        float fneq = (W[l] * 4.5f) * ((CIX[l]*CIX[l] - CSSQ) * pxx_val +
-                                      (CIY[l]*CIY[l] - CSSQ) * pyy_val +
-                                      (CIZ[l]*CIZ[l] - CSSQ) * pzz_val +
-                                       2.0f * CIX[l] * CIY[l] * pxy_val +
-                                       2.0f * CIX[l] * CIZ[l] * pxz_val +
-                                       2.0f * CIY[l] * CIZ[l] * pyz_val
+        float cu = 3.0f * (uxVal * CIX[l] + uyVal * CIY[l] + uzVal * CIZ[l]);
+        float feq = W[l] * (rhoVal + rhoVal * (cu + 0.5f * cu*cu - uu));
+        float HeF = auxHe * feq * ( (CIX[l] - uxVal) * ffx_val +
+                                    (CIY[l] - uyVal) * ffy_val +
+                                    (CIZ[l] - uzVal) * ffz_val ) * invRhoCssq;
+        float fneq = (W[l] * 4.5f) * ((CIX[l]*CIX[l] - CSSQ) * PXX +
+                                      (CIY[l]*CIY[l] - CSSQ) * PYY +
+                                      (CIZ[l]*CIZ[l] - CSSQ) * PZZ +
+                                       2.0f * CIX[l] * CIY[l] * PXY +
+                                       2.0f * CIX[l] * CIZ[l] * PXZ +
+                                       2.0f * CIY[l] * CIZ[l] * PYZ
                                      );
         int offset = inline4D(ii,jj,kk,l,NX,NY,NZ);
         f[offset] = feq + (1.0f - OMEGA) * fneq + HeF; 
     }
 }
 
-__global__ void collisionPhase(
+__global__ void gpuPhaseCollisionStream(
     float * __restrict__ g,
     const float * __restrict__ ux,
     const float * __restrict__ uy,
@@ -362,7 +310,8 @@ __global__ void fgBoundary(
     
     if (Ri > DIAM) return;
 
-    float u_in = U_JET; //* (1.0f + DATAZ[STEP / MACRO_SAVE] * 100);
+    float phi_in = 0.5f + 0.5f * tanh(2.0f * (DIAM - Ri) / 3.0f);
+    float uz_in = U_JET * phi_in; 
     
     int idx_in = inline3D(i,j,k,NX,NY);
 
@@ -370,27 +319,25 @@ __global__ void fgBoundary(
     float ffy_val = ffy[idx_in];
     float ffz_val = ffz[idx_in];
 
-    rho[idx_in] = 1.0f;
-    phi[idx_in] = 1.0f;
-    ux[idx_in] = 0.0f;
-    uy[idx_in] = 0.0f;
-    uz[idx_in] = u_in; 
-
-    float uz_val = uz[idx_in]; 
-    float rho_val = rho[idx_in];
-
-    float uu = 1.5f * (uz_val * uz_val);
+    float rho_val = 1.0f;
+    float uu = 1.5f * (uz_in * uz_in);
     float invRhoCssq = 3.0f / rho_val;
     float auxHe = 1.0f - OMEGA / 2.0f;  
 
+    rho[idx_in] = rho_val;
+    phi[idx_in] = phi_in;
+    ux[idx_in] = 0.0f;
+    uy[idx_in] = 0.0f;
+    uz[idx_in] = uz_in; 
+
     #pragma unroll 19
     for (int l = 0; l < NLINKS; ++l) {
-        float cu = 3.0f * (uz_val * CIZ[l]);
+        float cu = 3.0f * uz_in * CIZ[l];
         float feq = W[l] * (1.0f + (cu + 0.5f * cu*cu - uu));
 
         float HeF = auxHe * feq * (CIX[l] * ffx_val +
                                    CIY[l] * ffy_val +
-                                   (CIZ[l] - uz_val) * ffz_val) * invRhoCssq;
+                                   (CIZ[l] - uz_in) * ffz_val) * invRhoCssq;
         
         int i_new = i + CIX[l];
         int j_new = j + CIY[l];
@@ -406,8 +353,8 @@ __global__ void fgBoundary(
 
     #pragma unroll 19
     for (int l = 0; l < NLINKS; ++l) {
-        float cu = 3.0f * (uz_val * CIZ[l]);
-        float geq = W[l] * (1.0f + (cu + 0.5f * cu*cu - uu));
+        float cu = 3.0f * uz_in * CIZ[l];
+        float geq = W[l] * phi_in * (1.0f + cu);
 
         int i_new = i + CIX[l];
         int j_new = j + CIY[l];

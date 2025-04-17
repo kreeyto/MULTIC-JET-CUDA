@@ -37,7 +37,7 @@ int main(int argc, char* argv[]) {
     initializeVars();
 
     string INFO_FILE = SIM_DIR + ID + "_info.txt";
-    float H_TAU = 0.505f;
+    float H_TAU = 0.505f; // dummy value for info file
     generateSimulationInfoFile(INFO_FILE, NX, NY, NZ, MACRO_SAVE, NSTEPS, H_TAU, ID, VELOCITY_SET);
 
     dim3 threadsPerBlock(8,8,8);
@@ -46,21 +46,15 @@ int main(int argc, char* argv[]) {
                    (NZ + threadsPerBlock.z - 1) / threadsPerBlock.z);
 
     // STREAMS
-    cudaStream_t mainStream, collFluid, collPhase;
+    cudaStream_t mainStream;//, collFluid, collPhase;
     cudaStreamCreate(&mainStream);
-    cudaStreamCreate(&collFluid);
-    cudaStreamCreate(&collPhase);
+    //cudaStreamCreate(&collFluid);
+    //cudaStreamCreate(&collPhase);
 
     // ================== INIT ================== //
 
-        initTensor<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
-            d_pxx, d_pyy, d_pzz, 
-            d_pxy, d_pxz, d_pyz,
-            d_rho, NX, NY, NZ
-        );
-
         initDist<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
-            d_rho, d_phi, d_f, d_g, NX, NY, NZ
+            d_f, NX, NY, NZ
         ); 
 
     // ========================================= //
@@ -68,15 +62,12 @@ int main(int argc, char* argv[]) {
     vector<float> phi_host(NX * NY * NZ);
     vector<float> uz_host(NX * NY * NZ);
 
-    //int nThreads = 8 * 8 * 8;
-    //size_t shmemSize = sizeof(float) * nThreads * 5;
-
     for (int STEP = 0; STEP <= NSTEPS ; ++STEP) {
         cout << "Passo " << STEP << " de " << NSTEPS << " iniciado..." << endl;
 
         // ================= PHASE FIELD ================= //
             
-            phiCalc<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
+            gpuPhaseField<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
                 d_phi, d_g, NX, NY, NZ
             ); 
 
@@ -84,60 +75,38 @@ int main(int argc, char* argv[]) {
         
 
 
-        // ===================== NORMALS ===================== //
+        // ===================== INTERFACE ===================== //
 
-            gradCalc<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
-                d_phi, d_normx, d_normy, d_normz, d_indicator, 
-                NX, NY, NZ
+            gpuGradients<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
+                d_phi, d_normx, d_normy, d_normz, 
+                d_indicator, NX, NY, NZ
             ); 
+
+            gpuCurvature<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
+                d_indicator, d_normx, d_normy, d_normz,
+                d_ffx, d_ffy, d_ffz, NX, NY, NZ
+            );
 
         // =================================================== // 
-
-
-
-        // ==================== CURVATURE ==================== //
-
-            curvatureCalc<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
-                d_indicator, d_normx, d_normy, d_normz, 
-                d_ffx, d_ffy, d_ffz,
-                NX, NY, NZ
-            ); 
-            
-        // =================================================== //   
-
-
-        
-        // ===================== MOMENTI ===================== //
-
-            momentiCalc<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
-                d_ux, d_uy, d_uz, d_rho,
-                d_ffx, d_ffy, d_ffz, d_f,
-                d_pxx, d_pyy, d_pzz,
-                d_pxy, d_pxz, d_pyz,
-                NX, NY, NZ
-            ); 
-
-        // ================================================== //   
 
         
 
         // ==================== COLLISION & STREAMING ==================== //
             
-            collisionFluid<<<numBlocks, threadsPerBlock, 0, collFluid>>> (
-                d_f, d_ux, d_uy, d_uz, 
-                d_ffx, d_ffy, d_ffz, d_rho,
-                d_pxx, d_pyy, d_pzz, d_pxy, d_pxz, d_pyz, 
+            gpuMomCollisionStream<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
+                d_ux, d_uy, d_uz, d_rho, 
+                d_ffx, d_ffy, d_ffz, d_f,
                 NX, NY, NZ
             ); 
 
-            collisionPhase<<<numBlocks, threadsPerBlock, 0, collPhase>>> (
+            gpuPhaseCollisionStream<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
                 d_g, d_ux, d_uy, d_uz, 
                 d_phi, d_normx, d_normy, d_normz, 
                 NX, NY, NZ
             ); 
 
-            cudaStreamSynchronize(collFluid);
-            cudaStreamSynchronize(collPhase);
+            //cudaStreamSynchronize(collFluid);
+            //cudaStreamSynchronize(collPhase);
         // =============================================================== //    
 
 
@@ -167,15 +136,14 @@ int main(int argc, char* argv[]) {
     }
 
     cudaStreamDestroy(mainStream);
-    cudaStreamDestroy(collFluid);
-    cudaStreamDestroy(collPhase);
+    //cudaStreamDestroy(collFluid);
+    //cudaStreamDestroy(collPhase);
 
     float *pointers[] = {d_f, d_g, d_phi, d_rho,
                           d_normx, d_normy, d_normz, d_indicator,
-                          d_ffx, d_ffy, d_ffz, d_ux, d_uy, d_uz,
-                          d_pxx, d_pyy, d_pzz, d_pxy, d_pxz, d_pyz
+                          d_ffx, d_ffy, d_ffz, d_ux, d_uy, d_uz
                         };
-    freeMemory(pointers, 20);  
+    freeMemory(pointers, 14);  
 
     auto END_TIME = chrono::high_resolution_clock::now();
     chrono::duration<double> ELAPSED_TIME = END_TIME - START_TIME;

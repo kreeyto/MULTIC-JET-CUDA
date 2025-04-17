@@ -17,10 +17,6 @@ using namespace std;
 
 #define PRECISION_TYPE "float"
 
-#define BLOCK_X 8
-#define BLOCK_Y 8
-#define BLOCK_Z 8
-
 #define IDX3D(i,j,k) ((i) + (j) * NX + (k) * NX * NY)
 #define IDX4D(i,j,k,l) ((i) + (j) * NX + (k) * NX * NY + (l) * NX * NY * NZ)
 

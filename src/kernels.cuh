@@ -3,34 +3,20 @@
 
 #include "var.cuh"
 
-__global__ void initTensor(
-    float * __restrict__ pxx,
-    float * __restrict__ pyy,
-    float * __restrict__ pzz,
-    float * __restrict__ pxy,
-    float * __restrict__ pxz,
-    float * __restrict__ pyz,
-    float * __restrict__ rho,
-    const int NX, const int NY, const int NZ
-);
-
 __global__ void initDist(
-    const float * __restrict__ rho, 
-    const float * __restrict__ phi, 
     float * __restrict__ f,
-    float * __restrict__ g,
     const int NX, const int NY, const int NZ
 );
 
 // ============================================================================================== //
 
-__global__ void phiCalc(
+__global__ void gpuPhaseField(
     float * __restrict__ phi,
     const float * __restrict__ g,
     const int NX, const int NY, const int NZ
 );
 
-__global__ void gradCalc(
+__global__ void gpuGradients(
     const float * __restrict__ phi,
     float * __restrict__ normx,
     float * __restrict__ normy,
@@ -39,7 +25,7 @@ __global__ void gradCalc(
     const int NX, const int NY, const int NZ
 );
 
-__global__ void curvatureCalc(
+__global__ void gpuCurvature(
     const float * __restrict__ indicator,
     const float * __restrict__ normx,
     const float * __restrict__ normy,
@@ -50,7 +36,7 @@ __global__ void curvatureCalc(
     const int NX, const int NY, const int NZ
 );
 
-__global__ void momentiCalc(
+__global__ void gpuMomCollisionStream(
     float * __restrict__ ux,
     float * __restrict__ uy,
     float * __restrict__ uz,
@@ -58,35 +44,11 @@ __global__ void momentiCalc(
     const float * __restrict__ ffx,
     const float * __restrict__ ffy,
     const float * __restrict__ ffz,
-    const float * __restrict__ f,
-    float * __restrict__ pxx,
-    float * __restrict__ pyy,
-    float * __restrict__ pzz,
-    float * __restrict__ pxy,
-    float * __restrict__ pxz,
-    float * __restrict__ pyz,
-    const int NX, const int NY, const int NZ
-);
-
-__global__ void collisionFluid(
     float * __restrict__ f,
-    const float * __restrict__ ux,
-    const float * __restrict__ uy,
-    const float * __restrict__ uz,
-    const float * __restrict__ ffx,
-    const float * __restrict__ ffy,
-    const float * __restrict__ ffz,
-    const float * __restrict__ rho,
-    const float * __restrict__ pxx,
-    const float * __restrict__ pyy,
-    const float * __restrict__ pzz,
-    const float * __restrict__ pxy,
-    const float * __restrict__ pxz,
-    const float * __restrict__ pyz,
     const int NX, const int NY, const int NZ
 );
 
-__global__ void collisionPhase(
+__global__ void gpuPhaseCollisionStream(
     float * __restrict__ g,
     const float * __restrict__ ux,
     const float * __restrict__ uy,
