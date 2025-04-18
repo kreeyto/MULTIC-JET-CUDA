@@ -10,6 +10,7 @@ float U_JET = 0.05f;
 __constant__ float CSSQ;
 __constant__ float OMEGA;
 __constant__ float SHARP_C;
+__constant__ float INTERFACE_WIDTH;
 __constant__ float SIGMA;
 __constant__ float W[NLINKS];
 __constant__ int CIX[NLINKS], CIY[NLINKS], CIZ[NLINKS];
@@ -32,7 +33,8 @@ const float VISC = (U_JET * DIAM) / REYNOLDS;
 const float H_TAU = 0.5f + 3.0f * VISC;
 const float H_CSSQ = 1.0f / 3.0f;
 const float H_OMEGA = 1.0f / H_TAU;
-const float H_SHARP_C = 0.15f * 3.0f;
+const float H_INTERFACE_WIDTH = 7.0f;
+const float H_SHARP_C = 0.15f * H_INTERFACE_WIDTH;
 const float H_SIGMA = (U_JET * U_JET * DIAM) / WEBER;
 
 // velocity set
@@ -112,6 +114,7 @@ void initializeVars() {
     cudaMemcpyToSymbol(CSSQ, &H_CSSQ, sizeof(float));
     cudaMemcpyToSymbol(OMEGA, &H_OMEGA, sizeof(float));
     cudaMemcpyToSymbol(SHARP_C, &H_SHARP_C, sizeof(float));
+    cudaMemcpyToSymbol(INTERFACE_WIDTH, &H_INTERFACE_WIDTH, sizeof(float));
     cudaMemcpyToSymbol(SIGMA, &H_SIGMA, sizeof(float));
 
     cudaMemcpyToSymbol(W, &H_W, NLINKS * sizeof(float));

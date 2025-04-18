@@ -60,7 +60,7 @@ __global__ void gpuPhaseCollisionStream(
     const int NX, const int NY, const int NZ
 );
 
-__global__ void fgBoundary(
+__global__ void gpuInflow(
     float * __restrict__ rho,
     float * __restrict__ phi,
     float * __restrict__ ux,

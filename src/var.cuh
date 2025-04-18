@@ -6,7 +6,7 @@ extern int DIAM;
 extern int NX, NY, NZ;
 extern float U_JET;
 
-extern __constant__ float CSSQ, OMEGA, SHARP_C, SIGMA;
+extern __constant__ float CSSQ, OMEGA, SHARP_C, INTERFACE_WIDTH, SIGMA;
 extern __constant__ float W[NLINKS];
 extern __constant__ int CIX[NLINKS], CIY[NLINKS], CIZ[NLINKS];
 extern __constant__ float DATAZ[200];

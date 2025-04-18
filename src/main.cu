@@ -46,10 +46,8 @@ int main(int argc, char* argv[]) {
                    (NZ + threadsPerBlock.z - 1) / threadsPerBlock.z);
 
     // STREAMS
-    cudaStream_t mainStream;//, collFluid, collPhase;
+    cudaStream_t mainStream;
     cudaStreamCreate(&mainStream);
-    //cudaStreamCreate(&collFluid);
-    //cudaStreamCreate(&collPhase);
 
     // ================== INIT ================== //
 
@@ -105,15 +103,13 @@ int main(int argc, char* argv[]) {
                 NX, NY, NZ
             ); 
 
-            //cudaStreamSynchronize(collFluid);
-            //cudaStreamSynchronize(collPhase);
         // =============================================================== //    
 
 
     
         // ========================================== BOUNDARY ========================================== //
 
-            fgBoundary<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
+            gpuInflow<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
                 d_rho, d_phi,
                 d_ux, d_uy, d_uz, d_f, d_g, 
                 d_ffx, d_ffy, d_ffz,
@@ -136,8 +132,6 @@ int main(int argc, char* argv[]) {
     }
 
     cudaStreamDestroy(mainStream);
-    //cudaStreamDestroy(collFluid);
-    //cudaStreamDestroy(collPhase);
 
     float *pointers[] = {d_f, d_g, d_phi, d_rho,
                           d_normx, d_normy, d_normz, d_indicator,
