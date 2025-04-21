@@ -14,7 +14,7 @@ mkdir -p ${OUTPUT_DIR}
 
 echo "Compilando para ${OUTPUT_DIR}/${EXECUTABLE_NAME}..."
 
-nvcc -gencode arch=compute_${CC},code=sm_${CC} -rdc=true --ptxas-options=-v --restrict \
+nvcc -gencode arch=compute_${CC},code=sm_${CC} -rdc=true --ptxas-options=-v -O3 --restrict \
     ${SRC_DIR}/*.cu \
     -lcudadevrt -lcurand -D${VELOCITY_SET} \
     -o ${OUTPUT_DIR}/${EXECUTABLE_NAME}

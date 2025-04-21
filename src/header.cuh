@@ -1,5 +1,5 @@
-#ifndef PRECISION_CUH
-#define PRECISION_CUH
+#ifndef HEADER_CUH
+#define HEADER_CUH
 
 #include <cuda_runtime.h>
 #include <iostream>
@@ -17,20 +17,34 @@ using namespace std;
 
 #define PRECISION_TYPE "float"
 
-#define IDX3D(i,j,k) ((i) + (j) * NX + (k) * NX * NY)
-#define IDX4D(i,j,k,l) ((i) + (j) * NX + (k) * NX * NY + (l) * NX * NY * NZ)
+#define BLOCK_X 8
+#define BLOCK_Y 8
+#define BLOCK_Z 8
 
-__device__ __forceinline__ int inline3D(int i, int j, int k, int NX, int NY) {
-    return i + j * NX + k * NX * NY;
+#define IDX3D(x,y,z) ((x) + (y) * NX + (z) * NX * NY)
+#define IDX4D(x,y,z,Q) ((x) + (y) * NX + (z) * NX * NY + (Q) * NX * NY * NZ)
+
+__device__ __forceinline__ int idxGlobal3(int x, int y, int z, int NX, int NY) {
+    return x + y * NX + z * NX * NY;
 }
-__device__ __forceinline__ int inline4D(int i, int j, int k, int l, int NX, int NY, int NZ) {
-    return inline3D(i,j,k,NX,NY) + l * NX * NY * NZ;
+__device__ __forceinline__ int idxGlobal4(int x, int y, int z, int Q, int NX, int NY, int NZ) {
+    int slice = NX * NY;
+    return x + y * NX + z * slice + Q * slice * NZ;
+}
+
+__device__ __forceinline__ int idxShared3(int tx, int ty, int tz) {
+    return tx + ty * BLOCK_X + tz * BLOCK_X * BLOCK_Y;
+}
+
+__device__ __forceinline__ int idxShared4(int tx, int ty, int tz, int Q) {
+    int slice = BLOCK_X * BLOCK_Y;
+    return tx + ty * BLOCK_X + tz * slice + Q * slice * BLOCK_Z;
 }
 
 #ifdef D3Q19
-    #define NLINKS 19
+    constexpr int NLINKS = 19;
 #elif defined(D3Q27)
-    #define NLINKS 27
+    constexpr int NLINKS = 27;
 #endif
 
 #endif

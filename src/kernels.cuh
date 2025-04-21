@@ -36,7 +36,7 @@ __global__ void gpuCurvature(
     const int NX, const int NY, const int NZ
 );
 
-__global__ void gpuMomCollisionStream(
+__global__ void gpuMomOneCollisionStream(
     float * __restrict__ ux,
     float * __restrict__ uy,
     float * __restrict__ uz,
@@ -48,7 +48,7 @@ __global__ void gpuMomCollisionStream(
     const int NX, const int NY, const int NZ
 );
 
-__global__ void gpuPhaseCollisionStream(
+__global__ void gpuTwoCollisionStream(
     float * __restrict__ g,
     const float * __restrict__ ux,
     const float * __restrict__ uy,
@@ -71,7 +71,7 @@ __global__ void gpuInflow(
     const float * __restrict__ ffx,
     const float * __restrict__ ffy,
     const float * __restrict__ ffz,
-    const float U_MAX, const int D_HALF,
+    const float U_JET, const int DIAM,
     const int NX, const int NY, const int NZ
     //const int STEP, const int MACRO_SAVE
 );

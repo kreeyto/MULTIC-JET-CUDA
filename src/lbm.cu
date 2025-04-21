@@ -1,38 +1,32 @@
 #include "kernels.cuh"
 
-// ================================================================================================== //
+// =================================================================================================== //
 
 __global__ void gpuPhaseField(
     float * __restrict__ phi,
     const float * __restrict__ g,
     const int NX, const int NY, const int NZ
 ) {
-    int x = threadIdx.x + blockIdx.x * blockDim.x;
-    int y = threadIdx.y + blockIdx.y * blockDim.y;
-    int z = threadIdx.z + blockIdx.z * blockDim.z;
+    const int x = threadIdx.x + blockIdx.x * blockDim.x;
+    const int y = threadIdx.y + blockIdx.y * blockDim.y;
+    const int z = threadIdx.z + blockIdx.z * blockDim.z;
 
     if (x >= NX || y >= NY || z >= NZ || 
         x == 0 || x == NX-1 || 
         y == 0 || y == NY-1 || 
         z == 0 || z == NZ-1) return;
 
-    int idx = inline3D(x,y,z,NX,NY);
+    int idx = idxGlobal3(x,y,z,NX,NY);
     float phiVal = 0.0f;
 
-    #pragma unroll 19
+    #pragma unroll NLINKS
     for (int Q = 0; Q < NLINKS; ++Q) {
-        int idx4D = inline4D(x,y,z,Q,NX,NY,NZ);
+        int idx4D = idxGlobal4(x,y,z,Q,NX,NY,NZ);
         phiVal += g[idx4D];
     }
 
     phi[idx] = phiVal;
 }
-
-// =================================================================================================== //
-
-
-
-// =================================================================================================== //
 
 __global__ void gpuGradients(
     const float * __restrict__ phi,
@@ -42,33 +36,34 @@ __global__ void gpuGradients(
     float * __restrict__ indicator,
     const int NX, const int NY, const int NZ
 ) {
-    int x = threadIdx.x + blockIdx.x * blockDim.x;
-    int y = threadIdx.y + blockIdx.y * blockDim.y;
-    int z = threadIdx.z + blockIdx.z * blockDim.z;
+    const int x = threadIdx.x + blockIdx.x * blockDim.x;
+    const int y = threadIdx.y + blockIdx.y * blockDim.y;
+    const int z = threadIdx.z + blockIdx.z * blockDim.z;
 
     if (x >= NX || y >= NY || z >= NZ || 
         x == 0 || x == NX-1 || 
         y == 0 || y == NY-1 || 
         z == 0 || z == NZ-1) return;
 
-    int idx = inline3D(x,y,z,NX,NY);
+    int idx = idxGlobal3(x,y,z,NX,NY);
 
-    float gradx = 0.0f, grady = 0.0f, gradz = 0.0f;
-    #pragma unroll 19
-    for (int Q = 0; Q < NLINKS; ++Q) {
+    float gradx = 3.0f * (W[1]  * phi[IDX3D(x+1,y,z)]   - W[2]  * phi[IDX3D(x-1,y,z)]
+                        + W[7]  * phi[IDX3D(x+1,y+1,z)] - W[8]  * phi[IDX3D(x-1,y-1,z)]
+                        + W[9]  * phi[IDX3D(x+1,y,z+1)] - W[10] * phi[IDX3D(x-1,y,z-1)]
+                        + W[13] * phi[IDX3D(x+1,y-1,z)] - W[14] * phi[IDX3D(x-1,y+1,z)]
+                        + W[15] * phi[IDX3D(x+1,y,z-1)] - W[16] * phi[IDX3D(x-1,y,z+1)]);
 
-        int xx = (x + CIX[Q] + NX) % NX;
-        int yy = (y + CIY[Q] + NY) % NY;
-        int zz = z + CIZ[Q];
-        zz = min( max(zz, 1), NZ-2 );
-
-        int offset = inline3D(xx,yy,zz,NX,NY);
-        float phiVal = phi[offset];
-        float coef = 3.0f * W[Q];
-        gradx += coef * CIX[Q] * phiVal;
-        grady += coef * CIY[Q] * phiVal;
-        gradz += coef * CIZ[Q] * phiVal;
-    }
+    float grady = 3.0f * (W[3]  * phi[IDX3D(x,y+1,z)]   - W[4]  * phi[IDX3D(x,y-1,z)]
+                        + W[7]  * phi[IDX3D(x+1,y+1,z)] - W[8]  * phi[IDX3D(x-1,y-1,z)]
+                        + W[11] * phi[IDX3D(x,y+1,z+1)] - W[12] * phi[IDX3D(x,y-1,z-1)]
+                        - W[13] * phi[IDX3D(x+1,y-1,z)] + W[14] * phi[IDX3D(x-1,y+1,z)]
+                        + W[17] * phi[IDX3D(x,y+1,z-1)] - W[18] * phi[IDX3D(x,y-1,z+1)]);
+    
+    float gradz = 3.0f * (W[5]  * phi[IDX3D(x,y,z+1)]   - W[6]  * phi[IDX3D(x,y,z-1)]
+                        + W[9]  * phi[IDX3D(x+1,y,z+1)] - W[10] * phi[IDX3D(x-1,y,z-1)]
+                        + W[11] * phi[IDX3D(x,y+1,z+1)] - W[12] * phi[IDX3D(x,y-1,z-1)]
+                        - W[15] * phi[IDX3D(x+1,y,z-1)] + W[16] * phi[IDX3D(x-1,y,z+1)]
+                        - W[17] * phi[IDX3D(x,y+1,z-1)] + W[18] * phi[IDX3D(x,y-1,z+1)]);
     
     float gmagsq = gradx*gradx + grady*grady + gradz*gradz;
     float factor = rsqrtf(fmaxf(gmagsq, 1e-9));
@@ -78,12 +73,6 @@ __global__ void gpuGradients(
     normz[idx] = gradz * factor; 
     indicator[idx] = gmagsq * factor;  
 }
-
-// =================================================================================================== //
-
-
-
-// =================================================================================================== //
 
 __global__ void gpuCurvature(
     const float * __restrict__ indicator,
@@ -95,16 +84,16 @@ __global__ void gpuCurvature(
     float * __restrict__ ffz,
     const int NX, const int NY, const int NZ
 ) {
-    int x = threadIdx.x + blockIdx.x * blockDim.x;
-    int y = threadIdx.y + blockIdx.y * blockDim.y;
-    int z = threadIdx.z + blockIdx.z * blockDim.z;
+    const int x = threadIdx.x + blockIdx.x * blockDim.x;
+    const int y = threadIdx.y + blockIdx.y * blockDim.y;
+    const int z = threadIdx.z + blockIdx.z * blockDim.z;
 
     if (x >= NX || y >= NY || z >= NZ || 
         x == 0 || x == NX-1 || 
         y == 0 || y == NY-1 || 
         z == 0 || z == NZ-1) return;
 
-    int idx = inline3D(x,y,z,NX,NY);
+    int idx = idxGlobal3(x,y,z,NX,NY);
 
     float normxVal = normx[idx];
     float normyVal = normy[idx];
@@ -112,15 +101,14 @@ __global__ void gpuCurvature(
     float indVal = indicator[idx];
     float curvature = 0.0f;
 
-    #pragma unroll 19
+    #pragma unroll NLINKS
     for (int Q = 0; Q < NLINKS; ++Q) {
 
-        int xx = (x + CIX[Q] + NX) % NX;
-        int yy = (y + CIY[Q] + NY) % NY;
+        int xx = x + CIX[Q];
+        int yy = y + CIY[Q];
         int zz = z + CIZ[Q];
-        zz = min( max(zz, 1), NZ-2 );
 
-        int offset = inline3D(xx,yy,zz,NX,NY);
+        int offset = idxGlobal3(xx,yy,zz,NX,NY);
         float nox = normx[offset];
         float noy = normy[offset];
         float noz = normz[offset];
@@ -141,7 +129,7 @@ __global__ void gpuCurvature(
 
 // =================================================================================================== //
 
-__global__ void gpuMomCollisionStream(
+__global__ void gpuMomOneCollisionStream(
     float * __restrict__ ux,
     float * __restrict__ uy,
     float * __restrict__ uz,
@@ -152,28 +140,28 @@ __global__ void gpuMomCollisionStream(
     float * __restrict__ f,
     const int NX, const int NY, const int NZ
 ) {
-    int x = threadIdx.x + blockIdx.x * blockDim.x;
-    int y = threadIdx.y + blockIdx.y * blockDim.y;
-    int z = threadIdx.z + blockIdx.z * blockDim.z;
+    const int x = threadIdx.x + blockIdx.x * blockDim.x;
+    const int y = threadIdx.y + blockIdx.y * blockDim.y;
+    const int z = threadIdx.z + blockIdx.z * blockDim.z;
     
     if (x >= NX || y >= NY || z >= NZ || 
         x == 0 || x == NX-1 || 
         y == 0 || y == NY-1 || 
         z == 0 || z == NZ-1) return;
 
-    int idx = inline3D(x,y,z,NX,NY);
+    int idx = idxGlobal3(x,y,z,NX,NY);
     
     float fneq[NLINKS];
     float fVal[NLINKS];
 
-    #pragma unroll 19
+    #pragma unroll NLINKS
     for (int Q = 0; Q < NLINKS; ++Q) {
-        int idx4D = inline4D(x,y,z,Q,NX,NY,NZ);
+        int idx4D = idxGlobal4(x,y,z,Q,NX,NY,NZ);
         fVal[Q] = f[idx4D];
     }
 
     float rhoVal = 0.0f;
-    #pragma unroll 19
+    #pragma unroll NLINKS
     for (int Q = 0; Q < NLINKS; ++Q) 
         rhoVal += fVal[Q];
 
@@ -204,7 +192,7 @@ __global__ void gpuMomCollisionStream(
 
     float auxHe = 1.0f - OMEGA / 2.0f;
 
-    #pragma unroll 19
+    #pragma unroll NLINKS
     for (int Q = 0; Q < NLINKS; ++Q) {
         float cu = 3.0f * (uxVal * CIX[Q] + uyVal * CIY[Q] + uzVal * CIZ[Q]);
         float eqBase = rhoVal * (cu + 0.5f * cu*cu - uu);
@@ -225,13 +213,12 @@ __global__ void gpuMomCollisionStream(
 
     ux[idx] = uxVal; uy[idx] = uyVal; uz[idx] = uzVal;
 
-    #pragma unroll 19
+    #pragma unroll NLINKS
     for (int Q = 0; Q < NLINKS; ++Q) {
 
-        int xx = (x + CIX[Q] + NX) % NX;
-        int yy = (y + CIY[Q] + NY) % NY;
+        int xx = x + CIX[Q];
+        int yy = y + CIY[Q];
         int zz = z + CIZ[Q];
-        zz = min( max(zz, 1), NZ-2 );
 
         float cu = 3.0f * (uxVal*CIX[Q] + uyVal*CIY[Q] + uzVal*CIZ[Q]);
         float feq = W[Q] * (rhoVal + rhoVal * (cu + 0.5f * cu*cu - uu));
@@ -245,12 +232,12 @@ __global__ void gpuMomCollisionStream(
                                        2.0f * CIX[Q] * CIZ[Q] * PXZ +
                                        2.0f * CIY[Q] * CIZ[Q] * PYZ
                                      );
-        int offset = inline4D(xx,yy,zz,Q,NX,NY,NZ);
+        int offset = idxGlobal4(xx,yy,zz,Q,NX,NY,NZ);
         f[offset] = feq + (1.0f - OMEGA) * fneq + HeF; 
     }
 }
 
-__global__ void gpuPhaseCollisionStream(
+__global__ void gpuTwoCollisionStream(
     float * __restrict__ g,
     const float * __restrict__ ux,
     const float * __restrict__ uy,
@@ -261,16 +248,16 @@ __global__ void gpuPhaseCollisionStream(
     const float * __restrict__ normz,
     const int NX, const int NY, const int NZ
 ) {
-    int x = threadIdx.x + blockIdx.x * blockDim.x;
-    int y = threadIdx.y + blockIdx.y * blockDim.y;
-    int z = threadIdx.z + blockIdx.z * blockDim.z;
+    const int x = threadIdx.x + blockIdx.x * blockDim.x;
+    const int y = threadIdx.y + blockIdx.y * blockDim.y;
+    const int z = threadIdx.z + blockIdx.z * blockDim.z;
 
     if (x >= NX || y >= NY || z >= NZ || 
         x == 0 || x == NX-1 || 
         y == 0 || y == NY-1 || 
         z == 0 || z == NZ-1) return;
 
-    int idx = inline3D(x,y,z,NX,NY);
+    int idx = idxGlobal3(x,y,z,NX,NY);
 
     float uxVal = ux[idx];
     float uyVal = uy[idx];
@@ -282,20 +269,19 @@ __global__ void gpuPhaseCollisionStream(
     
     float uu = 1.5f * (uxVal*uxVal + uyVal*uyVal + uzVal*uzVal);
     float phiNorm = SHARP_C * phiVal * (1.0f - phiVal);
-    #pragma unroll 19
+    #pragma unroll NLINKS
     for (int Q = 0; Q < NLINKS; ++Q) {
 
-        int xx = (x + CIX[Q] + NX) % NX;
-        int yy = (y + CIY[Q] + NY) % NY;
+        int xx = x + CIX[Q];
+        int yy = y + CIY[Q];
         int zz = z + CIZ[Q];
-        zz = min( max(zz, 1), NZ-2 );
 
         float cu = 3.0f * (uxVal * CIX[Q] + uyVal * CIY[Q] + uzVal * CIZ[Q]);
         // was using first order
         //float geq = W[Q] * phiVal * (1.0f + cu);
         float geq = W[Q] * (phiVal + phiVal * (cu + 0.5f * cu*cu - uu));
         float Hi = W[Q] * phiNorm * (CIX[Q] * normxVal + CIY[Q] * normyVal + CIZ[Q] * normzVal);
-        int offset = inline4D(xx,yy,zz,Q,NX,NY,NZ);
+        int offset = idxGlobal4(xx,yy,zz,Q,NX,NY,NZ);
         g[offset] = geq + Hi;
     }
 }
@@ -305,6 +291,11 @@ __global__ void gpuPhaseCollisionStream(
 
 
 // =================================================================================================== //
+
+__device__ __forceinline__ float smoothstep(float edge0, float edge1, float x) {
+    x = fminf(fmaxf((x - edge0) / (edge1 - edge0), 0.0f), 1.0f);
+    return x * x * (3.0f - 2.0f * x);
+}
 
 __global__ void gpuInflow(
     float * __restrict__ rho,
@@ -321,9 +312,9 @@ __global__ void gpuInflow(
     const int NX, const int NY, const int NZ
     //const int STEP, const int MACRO_SAVE
 ) {
-    int x = threadIdx.x + blockIdx.x * blockDim.x;
-    int y = threadIdx.y + blockIdx.y * blockDim.y;
-    int z = threadIdx.z + blockIdx.z * blockDim.z;
+    const int x = threadIdx.x + blockIdx.x * blockDim.x;
+    const int y = threadIdx.y + blockIdx.y * blockDim.y;
+    const int z = threadIdx.z + blockIdx.z * blockDim.z;
     
     if (z != 0) return; 
     
@@ -335,11 +326,13 @@ __global__ void gpuInflow(
     float Ri = sqrtf(dx*dx + dy*dy);
     
     if (Ri > DIAM) return;
+    float Ri_norm = Ri / DIAM;
 
-    float phiIn = 1.0f; //0.5f + 0.5f * tanh(2.0f * (DIAM - Ri) / INTERFACE_WIDTH);
+    float weight = 1.0f - smoothstep(0.6f, 1.0f, Ri_norm);
+    float phiIn = weight;
     float uzIn = U_JET * phiIn; 
     
-    int idxIn = inline3D(x,y,z,NX,NY);
+    int idxIn = idxGlobal3(x,y,z,NX,NY);
 
     float ffxVal = ffx[idxIn];
     float ffyVal = ffy[idxIn];
@@ -356,7 +349,7 @@ __global__ void gpuInflow(
     uy[idxIn] = 0.0f;
     uz[idxIn] = uzIn; 
 
-    #pragma unroll 19
+    #pragma unroll NLINKS
     for (int Q = 0; Q < NLINKS; ++Q) {
         float cu = 3.0f * uzIn * CIZ[Q];
         float feq = W[Q] * (1.0f + (cu + 0.5f * cu*cu - uu));
@@ -364,28 +357,26 @@ __global__ void gpuInflow(
                                    CIY[Q] * ffyVal +
                                    (CIZ[Q] - uzIn) * ffzVal) * invRhoCssq;
 
-        int xx = (x + CIX[Q] + NX) % NX;
-        int yy = (y + CIY[Q] + NY) % NY;
+        int xx = x + CIX[Q];
+        int yy = y + CIY[Q];
         int zz = z + CIZ[Q];
-        zz = min( max(zz, 1), NZ-2 );
         
-        int offset = inline4D(xx,yy,zz,Q,NX,NY,NZ);
+        int offset = idxGlobal4(xx,yy,zz,Q,NX,NY,NZ);
         f[offset] = feq + HeF;
     }
 
-    #pragma unroll 19
+    #pragma unroll NLINKS
     for (int Q = 0; Q < NLINKS; ++Q) {
         float cu = 3.0f * uzIn * CIZ[Q];
         // was using first order
         //float geq = W[Q] * phiIn * (1.0f + cu);
         float geq = W[Q] * (phiIn + phiIn * (cu + 0.5f * cu*cu - uu));
 
-        int xx = (x + CIX[Q] + NX) % NX;
-        int yy = (y + CIY[Q] + NY) % NY;
+        int xx = x + CIX[Q];
+        int yy = y + CIY[Q];
         int zz = z + CIZ[Q];
-        zz = min( max(zz, 1), NZ-2 );
 
-        int offset = inline4D(xx,yy,zz,Q,NX,NY,NZ);
+        int offset = idxGlobal4(xx,yy,zz,Q,NX,NY,NZ);
         g[offset] = geq;
     }
 }

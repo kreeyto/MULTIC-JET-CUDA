@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
     // ============================================================================================================================================================= //
 
     // ================================= //
-    int MACRO_SAVE = 100, NSTEPS = 25000;
+    int MACRO_SAVE = 100, NSTEPS = 1000;
     // ================================= //
     initializeVars();
 
@@ -63,17 +63,11 @@ int main(int argc, char* argv[]) {
     for (int STEP = 0; STEP <= NSTEPS ; ++STEP) {
         cout << "Passo " << STEP << " de " << NSTEPS << " iniciado..." << endl;
 
-        // ================= PHASE FIELD ================= //
-            
+        // ================= PHASE & INTERFACE ================= //
+
             gpuPhaseField<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
                 d_phi, d_g, NX, NY, NZ
             ); 
-
-        // =============================================== // 
-        
-
-
-        // ===================== INTERFACE ===================== //
 
             gpuGradients<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
                 d_phi, d_normx, d_normy, d_normz, 
@@ -85,19 +79,19 @@ int main(int argc, char* argv[]) {
                 d_ffx, d_ffy, d_ffz, NX, NY, NZ
             );
 
-        // =================================================== // 
+        // ===================================================== // 
 
         
 
         // ==================== COLLISION & STREAMING ==================== //
             
-            gpuMomCollisionStream<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
+            gpuMomOneCollisionStream<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
                 d_ux, d_uy, d_uz, d_rho, 
                 d_ffx, d_ffy, d_ffz, d_f,
                 NX, NY, NZ
             ); 
 
-            gpuPhaseCollisionStream<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
+            gpuTwoCollisionStream<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
                 d_g, d_ux, d_uy, d_uz, 
                 d_phi, d_normx, d_normy, d_normz, 
                 NX, NY, NZ
@@ -133,10 +127,10 @@ int main(int argc, char* argv[]) {
 
     cudaStreamDestroy(mainStream);
 
-    float *pointers[] = {d_f, d_g, d_phi, d_rho,
+    float *pointers[] = { d_f, d_g, d_phi, d_rho,
                           d_normx, d_normy, d_normz, d_indicator,
-                          d_ffx, d_ffy, d_ffz, d_ux, d_uy, d_uz
-                        };
+                          d_ffx, d_ffy, d_ffz, 
+                          d_ux, d_uy, d_uz };
     freeMemory(pointers, 14);  
 
     auto END_TIME = chrono::high_resolution_clock::now();

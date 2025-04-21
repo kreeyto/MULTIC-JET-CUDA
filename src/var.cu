@@ -121,7 +121,7 @@ void initializeVars() {
 
     cudaMemcpyToSymbol(CIX, &H_CIX, NLINKS * sizeof(int));
     cudaMemcpyToSymbol(CIY, &H_CIY, NLINKS * sizeof(int));
-    cudaMemcpyToSymbol(CIZ, &H_CIZ, NLINKS * sizeof(int));
+    cudaMemcpyToSymbol(CIZ, &H_CIZ, NLINKS * sizeof(int)); 
 
     //cudaMemcpyToSymbol(DATAZ, &H_DATAZ, 200 * sizeof(float));
 }

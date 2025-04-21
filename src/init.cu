@@ -4,17 +4,17 @@ __global__ void initDist(
     float * __restrict__ f,
     const int NX, const int NY, const int NZ
 ) {
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    int j = threadIdx.y + blockIdx.y * blockDim.y;
-    int k = threadIdx.z + blockIdx.z * blockDim.z;
+    const int x = threadIdx.x + blockIdx.x * blockDim.x;
+    const int y = threadIdx.y + blockIdx.y * blockDim.y;
+    const int z = threadIdx.z + blockIdx.z * blockDim.z;
 
-    if (i >= NX || j >= NY || k >= NZ) return;
+    if (x >= NX || y >= NY || z >= NZ) return;
 
-    int idx3D = inline3D(i,j,k,NX,NY);
+    int idx3D = idxGlobal3(x,y,z,NX,NY);
 
-    #pragma unroll 19
-    for (int l = 0; l < NLINKS; ++l) {
-        int idx4D = inline4D(i,j,k,l,NX,NY,NZ);
-        f[idx4D] = W[l];
+    #pragma unroll NLINKS
+    for (int Q = 0; Q < NLINKS; ++Q) {
+        int idx4D = idxGlobal4(x,y,z,Q,NX,NY,NZ);
+        f[idx4D] = W[Q];
     }
 }
