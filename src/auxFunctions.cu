@@ -10,7 +10,7 @@ void freeMemory(float **pointers, int COUNT) {
 }
 
 void generateSimulationInfoFile(
-    const string& FILEPATH, const int NX, const int NY, const int NZ, const int MACRO_SAVE, const int NSTEPS, const float TAU, 
+    const string& FILEPATH, const int MACRO_SAVE, const int NSTEPS, const float TAU, 
     const string& SIM_ID, const string& VELOCITY_SET
 ) {
     try {

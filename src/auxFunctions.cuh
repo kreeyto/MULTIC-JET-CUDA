@@ -6,7 +6,7 @@
 void freeMemory(float **pointers, int COUNT);
 
 void generateSimulationInfoFile(
-    const string& FILEPATH, int NX, int NY, int NZ, int STAMP, int NSTEPS, float TAU, 
+    const string& FILEPATH, const int MACRO_SAVE, const int NSTEPS, const float TAU, 
     const string& SIM_ID, const string& VELOCITY_SET
 );
 

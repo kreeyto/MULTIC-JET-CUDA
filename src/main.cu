@@ -31,34 +31,44 @@ int main(int argc, char* argv[]) {
 
     // ============================================================================================================================================================= //
 
-    // ================================= //
-    int MACRO_SAVE = 100, NSTEPS = 1000;
-    // ================================= //
+    // =========================================== //
+
+        //#define RUN_MODE
+        //#define SAMPLE_MODE
+
+        #ifdef RUN_MODE
+            int MACRO_SAVE = 100, NSTEPS = 25000;
+        #elif defined(SAMPLE_MODE)
+            int MACRO_SAVE = 100, NSTEPS = 1000;
+        #else
+            int MACRO_SAVE = 1, NSTEPS = 0;
+        #endif
+    // ========================================== //
     initializeVars();
 
     string INFO_FILE = SIM_DIR + ID + "_info.txt";
     float H_TAU = 0.505f; // dummy value for info file
-    generateSimulationInfoFile(INFO_FILE, NX, NY, NZ, MACRO_SAVE, NSTEPS, H_TAU, ID, VELOCITY_SET);
+    generateSimulationInfoFile(INFO_FILE, MACRO_SAVE, NSTEPS, H_TAU, ID, VELOCITY_SET);
 
     dim3 threadsPerBlock(8,8,8);
     dim3 numBlocks((NX + threadsPerBlock.x - 1) / threadsPerBlock.x,
                    (NY + threadsPerBlock.y - 1) / threadsPerBlock.y,
                    (NZ + threadsPerBlock.z - 1) / threadsPerBlock.z);
 
+    dim3 threadsPerBlockBC(16,16);  
+    dim3 numBlocksBC((NX + threadsPerBlock.x - 1) / threadsPerBlock.x,
+                     (NY + threadsPerBlock.y - 1) / threadsPerBlock.y);    
+
     // STREAMS
     cudaStream_t mainStream;
     cudaStreamCreate(&mainStream);
 
-    // ================== INIT ================== //
-
-        initDist<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
-            d_f, NX, NY, NZ
-        ); 
-
-    // ========================================= //
+    initDist<<<numBlocks, threadsPerBlock, 0, mainStream>>> (d_f); 
 
     vector<float> phi_host(NX * NY * NZ);
     vector<float> uz_host(NX * NY * NZ);
+
+    size_t sharedSizeCurv = (8+2) * (8+2) * (8+2) * sizeof(float);
 
     for (int STEP = 0; STEP <= NSTEPS ; ++STEP) {
         cout << "Passo " << STEP << " de " << NSTEPS << " iniciado..." << endl;
@@ -66,17 +76,16 @@ int main(int argc, char* argv[]) {
         // ================= PHASE & INTERFACE ================= //
 
             gpuPhaseField<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
-                d_phi, d_g, NX, NY, NZ
+                d_phi, d_g
             ); 
 
             gpuGradients<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
-                d_phi, d_normx, d_normy, d_normz, 
-                d_indicator, NX, NY, NZ
+                d_phi, d_normx, d_normy, d_normz, d_indicator
             ); 
 
-            gpuCurvature<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
+            gpuCurvature<<<numBlocks, threadsPerBlock, sharedSizeCurv, mainStream>>> (
                 d_indicator, d_normx, d_normy, d_normz,
-                d_ffx, d_ffy, d_ffz, NX, NY, NZ
+                d_ffx, d_ffy, d_ffz
             );
 
         // ===================================================== // 
@@ -87,14 +96,12 @@ int main(int argc, char* argv[]) {
             
             gpuMomOneCollisionStream<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
                 d_ux, d_uy, d_uz, d_rho, 
-                d_ffx, d_ffy, d_ffz, d_f,
-                NX, NY, NZ
+                d_ffx, d_ffy, d_ffz, d_f
             ); 
 
             gpuTwoCollisionStream<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
                 d_g, d_ux, d_uy, d_uz, 
-                d_phi, d_normx, d_normy, d_normz, 
-                NX, NY, NZ
+                d_phi, d_normx, d_normy, d_normz
             ); 
 
         // =============================================================== //    
@@ -103,12 +110,10 @@ int main(int argc, char* argv[]) {
     
         // ========================================== BOUNDARY ========================================== //
 
-            gpuInflow<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
+            gpuInflow<<<numBlocksBC, threadsPerBlockBC, 0, mainStream>>> (
                 d_rho, d_phi,
                 d_ux, d_uy, d_uz, d_f, d_g, 
-                d_ffx, d_ffy, d_ffz,
-                U_JET, DIAM,
-                NX, NY, NZ
+                d_ffx, d_ffy, d_ffz
                 //STEP, MACRO_SAVE
             ); 
 

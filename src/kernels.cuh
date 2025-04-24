@@ -4,16 +4,14 @@
 #include "var.cuh"
 
 __global__ void initDist(
-    float * __restrict__ f,
-    const int NX, const int NY, const int NZ
+    float * __restrict__ f
 );
 
 // ============================================================================================== //
 
 __global__ void gpuPhaseField(
     float * __restrict__ phi,
-    const float * __restrict__ g,
-    const int NX, const int NY, const int NZ
+    const float * __restrict__ g
 );
 
 __global__ void gpuGradients(
@@ -21,8 +19,7 @@ __global__ void gpuGradients(
     float * __restrict__ normx,
     float * __restrict__ normy,
     float * __restrict__ normz,
-    float * __restrict__ indicator,
-    const int NX, const int NY, const int NZ
+    float * __restrict__ indicator
 );
 
 __global__ void gpuCurvature(
@@ -32,8 +29,7 @@ __global__ void gpuCurvature(
     const float * __restrict__ normz,
     float * __restrict__ ffx,
     float * __restrict__ ffy,
-    float * __restrict__ ffz,
-    const int NX, const int NY, const int NZ
+    float * __restrict__ ffz
 );
 
 __global__ void gpuMomOneCollisionStream(
@@ -44,8 +40,7 @@ __global__ void gpuMomOneCollisionStream(
     const float * __restrict__ ffx,
     const float * __restrict__ ffy,
     const float * __restrict__ ffz,
-    float * __restrict__ f,
-    const int NX, const int NY, const int NZ
+    float * __restrict__ f
 );
 
 __global__ void gpuTwoCollisionStream(
@@ -56,8 +51,7 @@ __global__ void gpuTwoCollisionStream(
     const float * __restrict__ phi,
     const float * __restrict__ normx,
     const float * __restrict__ normy,
-    const float * __restrict__ normz,
-    const int NX, const int NY, const int NZ
+    const float * __restrict__ normz
 );
 
 __global__ void gpuInflow(
@@ -70,9 +64,7 @@ __global__ void gpuInflow(
     float * __restrict__ g,
     const float * __restrict__ ffx,
     const float * __restrict__ ffy,
-    const float * __restrict__ ffz,
-    const float U_JET, const int DIAM,
-    const int NX, const int NY, const int NZ
+    const float * __restrict__ ffz
     //const int STEP, const int MACRO_SAVE
 );
 
