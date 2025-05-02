@@ -1,7 +1,5 @@
-#ifndef KERNELS_CUH
-#define KERNELS_CUH
-
-#include "var.cuh"
+#pragma once
+#include "device/data.cuh"
 
 __global__ void initDist(
     float * __restrict__ f
@@ -14,19 +12,12 @@ __global__ void gpuPhaseField(
     const float * __restrict__ g
 );
 
-__global__ void gpuGradients(
-    const float * __restrict__ phi,
+__global__ void gpuInterface(
+    float * __restrict__ phi,
+    const float * __restrict__ g,
     float * __restrict__ normx,
     float * __restrict__ normy,
     float * __restrict__ normz,
-    float * __restrict__ indicator
-);
-
-__global__ void gpuCurvature(
-    const float * __restrict__ indicator,
-    const float * __restrict__ normx,
-    const float * __restrict__ normy,
-    const float * __restrict__ normz,
     float * __restrict__ ffx,
     float * __restrict__ ffy,
     float * __restrict__ ffz
@@ -64,8 +55,6 @@ __global__ void gpuInflow(
     float * __restrict__ g,
     const float * __restrict__ ffx,
     const float * __restrict__ ffy,
-    const float * __restrict__ ffz
-    //const int STEP, const int MACRO_SAVE
+    const float * __restrict__ ffz,
+    const int STEP
 );
-
-#endif

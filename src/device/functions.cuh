@@ -1,13 +1,10 @@
-#ifndef GLOBALFUNCTIONS_CUH
-#define GLOBALFUNCTIONS_CUH
-
-#include "header.cuh"
-
-//#define FEQSTD
+#pragma once
+#include "common.cuh"
 
 __device__ __forceinline__ int gpuIdxGlobal3(int x, int y, int z) {
     return x + y * NX + z * NX * NY;
 }
+
 __device__ __forceinline__ int gpuIdxGlobal4(int x, int y, int z, int Q) {
     int slice = NX * NY;
     return x + y * NX + z * slice + Q * slice * NZ;
@@ -41,5 +38,3 @@ __device__ __forceinline__ float gpuFeq(float rho, float ux, float uy, float uz,
     float eqbase = rho * (cu + 0.5f * cu*cu - uu);
     return W[Q] * (rho + eqbase);
 }
-
-#endif

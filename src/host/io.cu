@@ -1,10 +1,11 @@
-#include "auxFunctions.cuh"
-#include "var.cuh"
+#include "host/io.cuh"
+#include "device/data.cuh"
 
-void freeMemory(float **pointers, int COUNT) {
+void freeDeviceMemory(float **pointers, int COUNT) {
     for (int i = 0; i < COUNT; ++i) {
         if (pointers[i] != nullptr) {
-            cudaFree(pointers[i]);
+            checkCudaErrors(cudaFree(pointers[i]));
+            pointers[i] = nullptr; 
         }
     }
 }
@@ -24,7 +25,7 @@ void generateSimulationInfoFile(
         file << "---------------------------- SIMULATION INFORMATION ----------------------------\n"
              << "                           Simulation ID: " << SIM_ID << '\n'
              << "                           Velocity set: " << VELOCITY_SET << '\n'
-             << "                           Precision: " << PRECISION_TYPE << '\n'
+             << "                           Precision: " << "float" << '\n'
              << "                           NX: " << NX << '\n'
              << "                           NY: " << NY << '\n'
              << "                           NZ: " << NZ << '\n'
@@ -51,17 +52,18 @@ void copyAndSaveToBinary(
     const string& ID, int STEP, const string& VAR_NAME
 ) {
     vector<float> host_data(SIZE);
-    
-    cudaMemcpy(host_data.data(), d_data, SIZE * sizeof(float), cudaMemcpyDeviceToHost);
-    
+
+    checkCudaErrors(cudaMemcpy(host_data.data(), d_data, SIZE * sizeof(float), cudaMemcpyDeviceToHost));
+
     ostringstream FILENAME;
     FILENAME << SIM_DIR << ID << "_" << VAR_NAME << setw(6) << setfill('0') << STEP << ".bin";
-    
+
     ofstream file(FILENAME.str(), ios::binary);
     if (!file) {
         cerr << "Erro ao abrir o arquivo " << FILENAME.str() << " para escrita." << endl;
         return;
     }
+
     file.write(reinterpret_cast<const char*>(host_data.data()), host_data.size() * sizeof(float));
     file.close();
 }

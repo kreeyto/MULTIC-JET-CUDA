@@ -1,5 +1,5 @@
-#include "kernels.cuh"
-#include "globalFunctions.cuh"
+#include "core/kernels.cuh"
+#include "device/functions.cuh"
 
 __global__ void initDist(float * __restrict__ f) {
     const int x = threadIdx.x + blockIdx.x * blockDim.x;
@@ -42,56 +42,12 @@ __global__ void gpuPhaseField(
     phi[idx] = phiVal;
 }
 
-__global__ void gpuGradients(
-    const float * __restrict__ phi,
+__global__ void gpuInterface(
+    float * __restrict__ phi,
+    const float * __restrict__ g,
     float * __restrict__ normx,
     float * __restrict__ normy,
     float * __restrict__ normz,
-    float * __restrict__ indicator
-) {
-    const int x = threadIdx.x + blockIdx.x * blockDim.x;
-    const int y = threadIdx.y + blockIdx.y * blockDim.y;
-    const int z = threadIdx.z + blockIdx.z * blockDim.z;
-
-    if (x >= NX || y >= NY || z >= NZ || 
-        x == 0 || x == NX-1 || 
-        y == 0 || y == NY-1 || 
-        z == 0 || z == NZ-1) return;
-
-    const int idx = gpuIdxGlobal3(x,y,z);
-
-    float gradx = 3.0f * (W[1]  * phi[IDX3D(x+1,y,z)]   - W[2]  * phi[IDX3D(x-1,y,z)]
-                        + W[7]  * phi[IDX3D(x+1,y+1,z)] - W[8]  * phi[IDX3D(x-1,y-1,z)]
-                        + W[9]  * phi[IDX3D(x+1,y,z+1)] - W[10] * phi[IDX3D(x-1,y,z-1)]
-                        + W[13] * phi[IDX3D(x+1,y-1,z)] - W[14] * phi[IDX3D(x-1,y+1,z)]
-                        + W[15] * phi[IDX3D(x+1,y,z-1)] - W[16] * phi[IDX3D(x-1,y,z+1)]);
-
-    float grady = 3.0f * (W[3]  * phi[IDX3D(x,y+1,z)]   - W[4]  * phi[IDX3D(x,y-1,z)]
-                        + W[7]  * phi[IDX3D(x+1,y+1,z)] - W[8]  * phi[IDX3D(x-1,y-1,z)]
-                        + W[11] * phi[IDX3D(x,y+1,z+1)] - W[12] * phi[IDX3D(x,y-1,z-1)]
-                        - W[13] * phi[IDX3D(x+1,y-1,z)] + W[14] * phi[IDX3D(x-1,y+1,z)]
-                        + W[17] * phi[IDX3D(x,y+1,z-1)] - W[18] * phi[IDX3D(x,y-1,z+1)]);
-    
-    float gradz = 3.0f * (W[5]  * phi[IDX3D(x,y,z+1)]   - W[6]  * phi[IDX3D(x,y,z-1)]
-                        + W[9]  * phi[IDX3D(x+1,y,z+1)] - W[10] * phi[IDX3D(x-1,y,z-1)]
-                        + W[11] * phi[IDX3D(x,y+1,z+1)] - W[12] * phi[IDX3D(x,y-1,z-1)]
-                        - W[15] * phi[IDX3D(x+1,y,z-1)] + W[16] * phi[IDX3D(x-1,y,z+1)]
-                        - W[17] * phi[IDX3D(x,y+1,z-1)] + W[18] * phi[IDX3D(x,y-1,z+1)]);
-    
-    float gmagsq = gradx*gradx + grady*grady + gradz*gradz;
-    float factor = rsqrtf(fmaxf(gmagsq, 1e-9));
-
-    normx[idx] = gradx * factor;
-    normy[idx] = grady * factor;
-    normz[idx] = gradz * factor; 
-    indicator[idx] = gmagsq * factor;  
-}
-
-__global__ void gpuCurvature(
-    const float * __restrict__ indicator,
-    const float * __restrict__ normx,
-    const float * __restrict__ normy,
-    const float * __restrict__ normz,
     float * __restrict__ ffx,
     float * __restrict__ ffy,
     float * __restrict__ ffz
@@ -112,80 +68,93 @@ __global__ void gpuCurvature(
     const int ly = ty + 1;
     const int lz = tz + 1;
 
+    __shared__ float s_phi[BLOCK_SIZE_Z+2][BLOCK_SIZE_Y+2][BLOCK_SIZE_X+2];
     __shared__ float s_normx[BLOCK_SIZE_Z+2][BLOCK_SIZE_Y+2][BLOCK_SIZE_X+2];
     __shared__ float s_normy[BLOCK_SIZE_Z+2][BLOCK_SIZE_Y+2][BLOCK_SIZE_X+2];
     __shared__ float s_normz[BLOCK_SIZE_Z+2][BLOCK_SIZE_Y+2][BLOCK_SIZE_X+2];
 
     const int idx = gpuIdxGlobal3(x,y,z);
-    
-    // load bulk into shared
-    s_normx[lz][ly][lx] = normx[idx];
-    s_normy[lz][ly][lx] = normy[idx];
-    s_normz[lz][ly][lx] = normz[idx];
 
-    // load halos into shared
-    if (tx == 0) {
-        s_normx[lz][ly][lx-1] = normx[gpuIdxGlobal3(x-1,y,z)];
-        s_normy[lz][ly][lx-1] = normy[gpuIdxGlobal3(x-1,y,z)];
-        s_normz[lz][ly][lx-1] = normz[gpuIdxGlobal3(x-1,y,z)];
-    }
-    if (tx == BLOCK_SIZE_X-1) {
-        s_normx[lz][ly][lx+1] = normx[gpuIdxGlobal3(x+1,y,z)];
-        s_normy[lz][ly][lx+1] = normy[gpuIdxGlobal3(x+1,y,z)];
-        s_normz[lz][ly][lx+1] = normz[gpuIdxGlobal3(x+1,y,z)];
-    }
-    if (ty == 0) {
-        s_normx[lz][ly-1][lx] = normx[gpuIdxGlobal3(x,y-1,z)];
-        s_normy[lz][ly-1][lx] = normy[gpuIdxGlobal3(x,y-1,z)];
-        s_normz[lz][ly-1][lx] = normz[gpuIdxGlobal3(x,y-1,z)];
-    }
-    if (ty == BLOCK_SIZE_Y-1) {
-        s_normx[lz][ly+1][lx] = normx[gpuIdxGlobal3(x,y+1,z)];
-        s_normy[lz][ly+1][lx] = normy[gpuIdxGlobal3(x,y+1,z)];
-        s_normz[lz][ly+1][lx] = normz[gpuIdxGlobal3(x,y+1,z)];
-    }
-    if (tz == 0) {
-        s_normx[lz-1][ly][lx] = normx[gpuIdxGlobal3(x,y,z-1)];
-        s_normy[lz-1][ly][lx] = normy[gpuIdxGlobal3(x,y,z-1)];
-        s_normz[lz-1][ly][lx] = normz[gpuIdxGlobal3(x,y,z-1)];
-    }
-    if (tz == BLOCK_SIZE_Z-1) {
-        s_normx[lz+1][ly][lx] = normx[gpuIdxGlobal3(x,y,z+1)];
-        s_normy[lz+1][ly][lx] = normy[gpuIdxGlobal3(x,y,z+1)];
-        s_normz[lz+1][ly][lx] = normz[gpuIdxGlobal3(x,y,z+1)];
-    }
+    s_phi[lz][ly][lx] = phi[idx];
     __syncthreads();
+    
+    // ================================= LOAD HALOS ================================= //
+    
+        // TODO: maybe its a good idea to hold phi in a temp sm variable and
+        //       load halos directly from it to evade global overhead.
+        //
+        //       also try to pull all halos instead of simple loading
 
-    float curvature = -3.0f * (W[1]  * (CIX[1]  * s_normx[lz][ly][lx+1]   + CIY[1]  * s_normy[lz][ly][lx+1]   + CIZ[1]  * s_normz[lz][ly][lx+1])
-                             + W[2]  * (CIX[2]  * s_normx[lz][ly][lx-1]   + CIY[2]  * s_normy[lz][ly][lx-1]   + CIZ[2]  * s_normz[lz][ly][lx-1])
-                             + W[3]  * (CIX[3]  * s_normx[lz][ly+1][lx]   + CIY[3]  * s_normy[lz][ly+1][lx]   + CIZ[3]  * s_normz[lz][ly+1][lx])
-                             + W[4]  * (CIX[4]  * s_normx[lz][ly-1][lx]   + CIY[4]  * s_normy[lz][ly-1][lx]   + CIZ[4]  * s_normz[lz][ly-1][lx])
-                             + W[5]  * (CIX[5]  * s_normx[lz+1][ly][lx]   + CIY[5]  * s_normy[lz+1][ly][lx]   + CIZ[5]  * s_normz[lz+1][ly][lx])
-                             + W[6]  * (CIX[6]  * s_normx[lz-1][ly][lx]   + CIY[6]  * s_normy[lz-1][ly][lx]   + CIZ[6]  * s_normz[lz-1][ly][lx])
-                             + W[7]  * (CIX[7]  * s_normx[lz][ly+1][lx+1] + CIY[7]  * s_normy[lz][ly+1][lx+1] + CIZ[7]  * s_normz[lz][ly+1][lx+1])
-                             + W[8]  * (CIX[8]  * s_normx[lz][ly-1][lx-1] + CIY[8]  * s_normy[lz][ly-1][lx-1] + CIZ[8]  * s_normz[lz][ly-1][lx-1])
-                             + W[9]  * (CIX[9]  * s_normx[lz+1][ly][lx+1] + CIY[9]  * s_normy[lz+1][ly][lx+1] + CIZ[9]  * s_normz[lz+1][ly][lx+1])
-                             + W[10] * (CIX[10] * s_normx[lz-1][ly][lx-1] + CIY[10] * s_normy[lz-1][ly][lx-1] + CIZ[10] * s_normz[lz-1][ly][lx-1])
-                             + W[11] * (CIX[11] * s_normx[lz+1][ly+1][lx] + CIY[11] * s_normy[lz+1][ly+1][lx] + CIZ[11] * s_normz[lz+1][ly+1][lx])
-                             + W[12] * (CIX[12] * s_normx[lz-1][ly-1][lx] + CIY[12] * s_normy[lz-1][ly-1][lx] + CIZ[12] * s_normz[lz-1][ly-1][lx])
-                             + W[13] * (CIX[13] * s_normx[lz][ly-1][lx+1] + CIY[13] * s_normy[lz][ly-1][lx+1] + CIZ[13] * s_normz[lz][ly-1][lx+1])
-                             + W[14] * (CIX[14] * s_normx[lz][ly+1][lx-1] + CIY[14] * s_normy[lz][ly+1][lx-1] + CIZ[14] * s_normz[lz][ly+1][lx-1])
-                             + W[15] * (CIX[15] * s_normx[lz-1][ly][lx+1] + CIY[15] * s_normy[lz-1][ly][lx+1] + CIZ[15] * s_normz[lz-1][ly][lx+1])
-                             + W[16] * (CIX[16] * s_normx[lz+1][ly][lx-1] + CIY[16] * s_normy[lz+1][ly][lx-1] + CIZ[16] * s_normz[lz+1][ly][lx-1])
-                             + W[17] * (CIX[17] * s_normx[lz-1][ly+1][lx] + CIY[17] * s_normy[lz-1][ly+1][lx] + CIZ[17] * s_normz[lz-1][ly+1][lx])
-                             + W[18] * (CIX[18] * s_normx[lz+1][ly-1][lx] + CIY[18] * s_normy[lz+1][ly-1][lx] + CIZ[18] * s_normz[lz+1][ly-1][lx]));
+        if (tx == 0) s_phi[lz][ly][lx-1] = phi[gpuIdxGlobal3(x-1,y,z)];
+        if (tx == BLOCK_SIZE_X-1) s_phi[lz][ly][lx+1] = phi[gpuIdxGlobal3(x+1,y,z)];
+
+        if (ty == 0) s_phi[lz][ly-1][lx] = phi[gpuIdxGlobal3(x,y-1,z)];
+        if (ty == BLOCK_SIZE_Y-1) s_phi[lz][ly+1][lx] = phi[gpuIdxGlobal3(x,y+1,z)];
+
+        if (tz == 0) s_phi[lz-1][ly][lx] = phi[gpuIdxGlobal3(x,y,z-1)];
+        if (tz == BLOCK_SIZE_Z-1) s_phi[lz+1][ly][lx] = phi[gpuIdxGlobal3(x,y,z+1)];
+
+        __syncthreads();
+
+    
+   // ============================================================================== //
+
+    float gradx = 3.0f * (W[1]  * s_phi[lz][ly][lx+1]   - W[2]  * s_phi[lz][ly][lx-1]
+                        + W[7]  * s_phi[lz][ly+1][lx+1] - W[8]  * s_phi[lz][ly-1][lx-1]
+                        + W[9]  * s_phi[lz+1][ly][lx+1] - W[10] * s_phi[lz-1][ly][lx-1]
+                        + W[13] * s_phi[lz][ly-1][lx+1] - W[14] * s_phi[lz][ly+1][lx-1]
+                        + W[15] * s_phi[lz-1][ly][lx+1] - W[16] * s_phi[lz+1][ly][lx-1]);
+
+    float grady = 3.0f * (W[3]  * s_phi[lz][ly+1][lx]   - W[4]  * s_phi[lz][ly-1][lx]
+                        + W[7]  * s_phi[lz][ly+1][lx+1] - W[8]  * s_phi[lz][ly-1][lx-1]
+                        + W[11] * s_phi[lz+1][ly+1][lx] - W[12] * s_phi[lz-1][ly-1][lx]
+                        + W[14] * s_phi[lz][ly+1][lx-1] - W[13] * s_phi[lz][ly-1][lx+1]
+                        + W[17] * s_phi[lz-1][ly+1][lx] - W[18] * s_phi[lz+1][ly-1][lx]);
+
+    float gradz = 3.0f * (W[5]  * s_phi[lz+1][ly][lx]   - W[6]  * s_phi[lz-1][ly][lx]
+                        + W[9]  * s_phi[lz+1][ly][lx+1] - W[10] * s_phi[lz-1][ly][lx-1]
+                        + W[11] * s_phi[lz+1][ly+1][lx] - W[12] * s_phi[lz-1][ly-1][lx]
+                        + W[16] * s_phi[lz+1][ly][lx-1] - W[15] * s_phi[lz-1][ly][lx+1]
+                        + W[18] * s_phi[lz+1][ly-1][lx] - W[17] * s_phi[lz-1][ly+1][lx]);
+    
+    float gmagsq = gradx*gradx + grady*grady + gradz*gradz;
+    float factor = rsqrtf(fmaxf(gmagsq, 1e-9));
+
+    s_normx[lz][ly][lx] = gradx * factor;
+    s_normy[lz][ly][lx] = grady * factor;
+    s_normz[lz][ly][lx] = gradz * factor; 
+    float ind_ = gmagsq * factor;  
+    __syncthreads();
+    
+    float curvature = -3.0f * (W[1]  * (s_normx[lz][ly][lx+1])  
+                             - W[2]  * (s_normx[lz][ly][lx-1])
+                             + W[3]  * (s_normy[lz][ly+1][lx])  
+                             - W[4]  * (s_normy[lz][ly-1][lx])
+                             + W[5]  * (s_normz[lz+1][ly][lx])  
+                             - W[6]  * (s_normz[lz-1][ly][lx])
+                             + W[7]  * (s_normx[lz][ly+1][lx+1] + s_normy[lz][ly+1][lx+1]) 
+                             - W[8]  * (s_normx[lz][ly-1][lx-1] + s_normy[lz][ly-1][lx-1])
+                             + W[9]  * (s_normx[lz+1][ly][lx+1] + s_normz[lz+1][ly][lx+1]) 
+                             - W[10] * (s_normx[lz-1][ly][lx-1] + s_normz[lz-1][ly][lx-1])
+                             + W[11] * (s_normy[lz+1][ly+1][lx] + s_normz[lz+1][ly+1][lx]) 
+                             - W[12] * (s_normy[lz-1][ly-1][lx] + s_normz[lz-1][ly-1][lx]) // end of sgn
+                             + W[13] * (s_normx[lz][ly-1][lx+1] + s_normy[lz][ly-1][lx+1])
+                             + W[14] * (s_normx[lz][ly+1][lx-1] + s_normy[lz][ly+1][lx-1])
+                             + W[15] * (s_normx[lz-1][ly][lx+1] + s_normz[lz-1][ly][lx+1])
+                             + W[16] * (s_normx[lz+1][ly][lx-1] + s_normz[lz+1][ly][lx-1])
+                             + W[17] * (s_normy[lz-1][ly+1][lx] + s_normz[lz-1][ly+1][lx])
+                             + W[18] * (s_normy[lz+1][ly-1][lx] + s_normz[lz+1][ly-1][lx]));    
 
     float mult = SIGMA * curvature;
-    float indVal = indicator[idx];
-    float normxVal = s_normx[lz][ly][lx];
-    float normyVal = s_normy[lz][ly][lx];
-    float normzVal = s_normz[lz][ly][lx];
+    ffx[idx] = mult * s_normx[lz][ly][lx] * ind_;
+    ffy[idx] = mult * s_normy[lz][ly][lx] * ind_;
+    ffz[idx] = mult * s_normz[lz][ly][lx] * ind_;
 
-    ffx[idx] = mult * normxVal * indVal;
-    ffy[idx] = mult * normyVal * indVal;
-    ffz[idx] = mult * normzVal * indVal;
+    normx[idx] = s_normx[lz][ly][lx];
+    normy[idx] = s_normy[lz][ly][lx];
+    normz[idx] = s_normz[lz][ly][lx];
+    phi[idx] = s_phi[lz][ly][lx];
 }
-
 
 // =================================================================================================== //
 
@@ -339,7 +308,8 @@ __global__ void gpuInflow(
     float * __restrict__ g,
     const float * __restrict__ ffx,
     const float * __restrict__ ffy,
-    const float * __restrict__ ffz
+    const float * __restrict__ ffz,
+    const int STEP
 ) {
     const int x = threadIdx.x + blockIdx.x * blockDim.x;
     const int y = threadIdx.y + blockIdx.y * blockDim.y;
@@ -359,7 +329,12 @@ __global__ void gpuInflow(
 
     float weight = 1.0f - smoothstep(0.6f, 1.0f, Ri_norm);
     float phiIn = weight;
-    float uzIn = U_JET * phiIn; 
+
+    #ifdef PERTURBATION
+        float uzIn = U_JET * (1.0f + DATAZ[STEP / MACRO_SAVE] * 10) * phiIn; 
+    #else
+        float uzIn = U_JET * phiIn; 
+    #endif
     
     const int idxIn = gpuIdxGlobal3(x,y,z);
 
@@ -382,8 +357,8 @@ __global__ void gpuInflow(
         const int xx = x + CIX[Q], yy = y + CIY[Q], zz = z + CIZ[Q];
         float feq = gpuFeq(1.0f, 0.0f, 0.0f, uzIn, uu, Q);
         float HeF = auxHe * feq * (CIX[Q] * ffxVal +
-                                   CIY[Q] * ffyVal +
-                                  (CIZ[Q] - uzIn) * ffzVal) * 3.0f; // was * invRho
+                                CIY[Q] * ffyVal +
+                                (CIZ[Q] - uzIn) * ffzVal) * 3.0f; // was * invRho
         const int str = gpuIdxGlobal4(xx, yy, zz, Q);
         f[str] = feq + HeF;
     }
