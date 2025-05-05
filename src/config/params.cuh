@@ -27,17 +27,21 @@ extern __constant__ int CIX[NLINKS], CIY[NLINKS], CIZ[NLINKS];
     extern __constant__ float DATAZ[200];
 #endif
 
+// domain size
 constexpr int MESH = 64;
 constexpr int DIAM = (MESH + 9) / 10;
 constexpr int NX = MESH;
 constexpr int NY = MESH;
-constexpr int NZ = MESH*2;
+constexpr int NZ = MESH*4;
 
+// jet velocity
 constexpr float U_JET = 0.05f;
 
+// adimensional parameters
 constexpr int REYNOLDS = 5000;
 constexpr int WEBER = 500;
 
+// general model parameters
 constexpr float VISC = (U_JET * DIAM) / REYNOLDS;
 constexpr float H_TAU = 0.5f + 3.0f * VISC;
 constexpr float H_CSSQ = 1.0f / 3.0f;

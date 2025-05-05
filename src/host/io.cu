@@ -1,15 +1,6 @@
 #include "host/io.cuh"
 #include "device/data.cuh"
 
-void freeDeviceMemory(float **pointers, int COUNT) {
-    for (int i = 0; i < COUNT; ++i) {
-        if (pointers[i] != nullptr) {
-            checkCudaErrors(cudaFree(pointers[i]));
-            pointers[i] = nullptr; 
-        }
-    }
-}
-
 void generateSimulationInfoFile(
     const string& FILEPATH, const int MACRO_SAVE, const int NSTEPS, const float TAU, 
     const string& SIM_ID, const string& VELOCITY_SET

@@ -48,12 +48,13 @@ int main(int argc, char* argv[]) {
     cudaStream_t mainStream;
     checkCudaErrors(cudaStreamCreate(&mainStream));
 
-    initDist<<<numBlocks, threadsPerBlock, 0, mainStream>>> (d_f); 
-    getLastCudaError("initDist");
-    int haloX = threadsPerBlock.x + 2;
-    int haloY = threadsPerBlock.y + 2;
-    int haloZ = threadsPerBlock.z + 2;
-    size_t sharedSize = 4 * haloX * haloY * haloZ * sizeof(float);
+    gpuInitDistributions<<<numBlocks,threadsPerBlock,0,mainStream>>> (d); 
+    getLastCudaError("gpuInitDistributions");
+
+    //int haloX = threadsPerBlock.x + 2;
+    //int haloY = threadsPerBlock.y + 2;
+    //int haloZ = threadsPerBlock.z + 2;
+    //size_t sharedSize = 3 * haloX * haloY * haloZ * sizeof(float);
 
     vector<float> phi_host(NX * NY * NZ); 
     vector<float> uz_host(NX * NY * NZ);
@@ -63,13 +64,11 @@ int main(int argc, char* argv[]) {
 
         // ================= PHASE & INTERFACE ================= //
 
-            gpuPhaseField<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
-                d_phi, d_g
-            ); getLastCudaError("gpuPhaseField");
+            gpuComputePhaseField<<<numBlocks,threadsPerBlock,0,mainStream>>> (d); 
+            getLastCudaError("gpuComputePhaseField");
 
-            gpuInterface<<<numBlocks, threadsPerBlock, sharedSize, mainStream>>> (
-                d_phi, d_g, d_normx, d_normy, d_normz, d_ffx, d_ffy, d_ffz
-            ); getLastCudaError("gpuInterface");
+            gpuComputeInterface<<<numBlocks,threadsPerBlock,0,mainStream>>> (d); 
+            getLastCudaError("gpuComputeInterface");
 
         // ===================================================== // 
 
@@ -77,15 +76,11 @@ int main(int argc, char* argv[]) {
 
         // ==================== COLLISION & STREAMING ==================== //
             
-            gpuMomOneCollisionStream<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
-                d_ux, d_uy, d_uz, d_rho, 
-                d_ffx, d_ffy, d_ffz, d_f
-            ); getLastCudaError("gpuMomOneCollisionStream");
+            gpuFusedCollisionStream<<<numBlocks,threadsPerBlock,0,mainStream>>> (d); 
+            getLastCudaError("gpuFusedCollisionStream");
 
-            gpuTwoCollisionStream<<<numBlocks, threadsPerBlock, 0, mainStream>>> (
-                d_g, d_ux, d_uy, d_uz, 
-                d_phi, d_normx, d_normy, d_normz
-            ); getLastCudaError("gpuTwoCollisionStream");
+            gpuEvolveScalarField<<<numBlocks,threadsPerBlock,0,mainStream>>> (d); 
+            getLastCudaError("gpuEvolveScalarField");
 
         // =============================================================== //    
 
@@ -93,12 +88,8 @@ int main(int argc, char* argv[]) {
     
         // ========================================== BOUNDARY ========================================== //
 
-            gpuInflow<<<numBlocksBC, threadsPerBlockBC, 0, mainStream>>> (
-                d_rho, d_phi,
-                d_ux, d_uy, d_uz, d_f, d_g, 
-                d_ffx, d_ffy, d_ffz,
-                STEP
-            ); getLastCudaError("gpuInflow");
+            gpuApplyInflowBoundary<<<numBlocksBC,threadsPerBlockBC,0,mainStream>>> (d,STEP); 
+            getLastCudaError("gpuApplyInflowBoundary");
 
         // ============================================================================================= //
 
@@ -106,8 +97,8 @@ int main(int argc, char* argv[]) {
 
         if (STEP % MACRO_SAVE == 0) {
 
-            copyAndSaveToBinary(d_phi, NX * NY * NZ, SIM_DIR, ID, STEP, "phi");
-            copyAndSaveToBinary(d_uz, NX * NY * NZ, SIM_DIR, ID, STEP, "uz");
+            copyAndSaveToBinary(d.phi, NX * NY * NZ, SIM_DIR, ID, STEP, "phi");
+            copyAndSaveToBinary(d.uz, NX * NY * NZ, SIM_DIR, ID, STEP, "uz");
 
             cout << "Passo " << STEP << ": Dados salvos em " << SIM_DIR << endl;
         }
@@ -115,11 +106,19 @@ int main(int argc, char* argv[]) {
 
     checkCudaErrors(cudaStreamDestroy(mainStream));
 
-    float *pointers[] = { d_f, d_g, d_phi, d_rho,
-                          d_normx, d_normy, d_normz,
-                          d_ffx, d_ffy, d_ffz, 
-                          d_ux, d_uy, d_uz };
-    freeDeviceMemory(pointers, 13);  
+    cudaFree(d.f);
+    cudaFree(d.g);
+    cudaFree(d.rho);
+    cudaFree(d.phi);
+    cudaFree(d.ux);
+    cudaFree(d.uy);
+    cudaFree(d.uz);
+    cudaFree(d.normx);
+    cudaFree(d.normy);
+    cudaFree(d.normz);
+    cudaFree(d.ffx);
+    cudaFree(d.ffy);
+    cudaFree(d.ffz);
 
     auto END_TIME = chrono::high_resolution_clock::now();
     chrono::duration<double> ELAPSED_TIME = END_TIME - START_TIME;
