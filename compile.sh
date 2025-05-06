@@ -22,10 +22,12 @@ nvcc -O3 --restrict \
      -gencode arch=compute_${CC},code=sm_${CC} \
      -rdc=true --ptxas-options=-v \
      -I"${SRC_DIR}" \
-     "${SRC_DIR}/core/main.cu" \
-     "${SRC_DIR}/core/lbm.cu" \
-     "${SRC_DIR}/device/setup.cu" \
-     "${SRC_DIR}/host/io.cu" \
+     "${SRC_DIR}/main.cu" \
+     "${SRC_DIR}/interface.cu" \
+     "${SRC_DIR}/lbm.cu" \
+     "${SRC_DIR}/boundaryConditions.cu" \
+     "${SRC_DIR}/deviceSetup.cu" \
+     "${SRC_DIR}/hostFunctions.cu" \
      -lcudadevrt -lcurand -D${VELOCITY_SET} \
      -o "${EXECUTABLE}"
 

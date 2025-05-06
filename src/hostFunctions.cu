@@ -1,5 +1,5 @@
-#include "host/io.cuh"
-#include "device/data.cuh"
+#include "hostFunctions.cuh"
+#include "deviceStructs.cuh"
 
 void generateSimulationInfoFile(
     const string& FILEPATH, const int MACRO_SAVE, const int NSTEPS, const float TAU, 

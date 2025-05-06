@@ -1,6 +1,6 @@
-#include "core/kernels.cuh"
-#include "host/io.cuh"
-#include "device/data.cuh"
+#include "kernels.cuh"
+#include "hostFunctions.cuh"
+#include "deviceStructs.cuh"
 
 int main(int argc, char* argv[]) {
     auto START_TIME = chrono::high_resolution_clock::now();
@@ -31,30 +31,25 @@ int main(int argc, char* argv[]) {
 
     // ============================================================================================================================================================= //
 
-    initializeVars();
+    initDeviceVars();
 
     string INFO_FILE = SIM_DIR + ID + "_info.txt";
     generateSimulationInfoFile(INFO_FILE, MACRO_SAVE, NSTEPS, H_TAU, ID, VELOCITY_SET);
 
-    dim3 threadsPerBlock(8,8,8);
+    dim3 threadsPerBlock(BLOCK_SIZE_X,BLOCK_SIZE_Y,BLOCK_SIZE_Z);
     dim3 numBlocks((NX + threadsPerBlock.x - 1) / threadsPerBlock.x,
                    (NY + threadsPerBlock.y - 1) / threadsPerBlock.y,
                    (NZ + threadsPerBlock.z - 1) / threadsPerBlock.z);
 
-    dim3 threadsPerBlockBC(16,16);  
+    dim3 threadsPerBlockBC(BLOCK_SIZE_X*2,BLOCK_SIZE_Y*2);  
     dim3 numBlocksBC((NX + threadsPerBlock.x - 1) / threadsPerBlock.x,
                      (NY + threadsPerBlock.y - 1) / threadsPerBlock.y);    
 
     cudaStream_t mainStream;
     checkCudaErrors(cudaStreamCreate(&mainStream));
 
-    gpuInitDistributions<<<numBlocks,threadsPerBlock,0,mainStream>>> (d); 
+    gpuInitDistributions<<<numBlocks,threadsPerBlock,0,mainStream>>> (lbm); 
     getLastCudaError("gpuInitDistributions");
-
-    //int haloX = threadsPerBlock.x + 2;
-    //int haloY = threadsPerBlock.y + 2;
-    //int haloZ = threadsPerBlock.z + 2;
-    //size_t sharedSize = 3 * haloX * haloY * haloZ * sizeof(float);
 
     vector<float> phi_host(NX * NY * NZ); 
     vector<float> uz_host(NX * NY * NZ);
@@ -62,24 +57,24 @@ int main(int argc, char* argv[]) {
     for (int STEP = 0; STEP <= NSTEPS ; ++STEP) {
         cout << "Passo " << STEP << " de " << NSTEPS << " iniciado..." << endl;
 
-        // ================= PHASE & INTERFACE ================= //
+        // ======================= INTERFACE ======================= //
 
-            gpuComputePhaseField<<<numBlocks,threadsPerBlock,0,mainStream>>> (d); 
+            gpuComputePhaseField<<<numBlocks,threadsPerBlock,0,mainStream>>> (lbm); 
             getLastCudaError("gpuComputePhaseField");
 
-            gpuComputeInterface<<<numBlocks,threadsPerBlock,0,mainStream>>> (d); 
+            gpuComputeInterface<<<numBlocks,threadsPerBlock,0,mainStream>>> (lbm); 
             getLastCudaError("gpuComputeInterface");
 
-        // ===================================================== // 
+        // ======================================================== // 
 
         
 
         // ==================== COLLISION & STREAMING ==================== //
             
-            gpuFusedCollisionStream<<<numBlocks,threadsPerBlock,0,mainStream>>> (d); 
+            gpuFusedCollisionStream<<<numBlocks,threadsPerBlock,0,mainStream>>> (lbm); 
             getLastCudaError("gpuFusedCollisionStream");
 
-            gpuEvolveScalarField<<<numBlocks,threadsPerBlock,0,mainStream>>> (d); 
+            gpuEvolveScalarField<<<numBlocks,threadsPerBlock,0,mainStream>>> (lbm); 
             getLastCudaError("gpuEvolveScalarField");
 
         // =============================================================== //    
@@ -88,7 +83,7 @@ int main(int argc, char* argv[]) {
     
         // ========================================== BOUNDARY ========================================== //
 
-            gpuApplyInflowBoundary<<<numBlocksBC,threadsPerBlockBC,0,mainStream>>> (d,STEP); 
+            gpuApplyInflowBoundary<<<numBlocksBC,threadsPerBlockBC,0,mainStream>>> (lbm,STEP); 
             getLastCudaError("gpuApplyInflowBoundary");
 
         // ============================================================================================= //
@@ -97,8 +92,8 @@ int main(int argc, char* argv[]) {
 
         if (STEP % MACRO_SAVE == 0) {
 
-            copyAndSaveToBinary(d.phi, NX * NY * NZ, SIM_DIR, ID, STEP, "phi");
-            copyAndSaveToBinary(d.uz, NX * NY * NZ, SIM_DIR, ID, STEP, "uz");
+            copyAndSaveToBinary(lbm.phi, NX * NY * NZ, SIM_DIR, ID, STEP, "phi");
+            copyAndSaveToBinary(lbm.uz, NX * NY * NZ, SIM_DIR, ID, STEP, "uz");
 
             cout << "Passo " << STEP << ": Dados salvos em " << SIM_DIR << endl;
         }
@@ -106,19 +101,19 @@ int main(int argc, char* argv[]) {
 
     checkCudaErrors(cudaStreamDestroy(mainStream));
 
-    cudaFree(d.f);
-    cudaFree(d.g);
-    cudaFree(d.rho);
-    cudaFree(d.phi);
-    cudaFree(d.ux);
-    cudaFree(d.uy);
-    cudaFree(d.uz);
-    cudaFree(d.normx);
-    cudaFree(d.normy);
-    cudaFree(d.normz);
-    cudaFree(d.ffx);
-    cudaFree(d.ffy);
-    cudaFree(d.ffz);
+    cudaFree(lbm.f);
+    cudaFree(lbm.g);
+    cudaFree(lbm.phi);
+    cudaFree(lbm.rho);
+    cudaFree(lbm.ux);
+    cudaFree(lbm.uy);
+    cudaFree(lbm.uz);
+    cudaFree(lbm.normx);
+    cudaFree(lbm.normy);
+    cudaFree(lbm.normz);
+    cudaFree(lbm.ffx);
+    cudaFree(lbm.ffy);
+    cudaFree(lbm.ffz);
 
     auto END_TIME = chrono::high_resolution_clock::now();
     chrono::duration<double> ELAPSED_TIME = END_TIME - START_TIME;

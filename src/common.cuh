@@ -15,5 +15,5 @@
 #include <stdlib.h>
 #include <builtin_types.h>
 #include <math.h>
-#include "config/params.cuh"
-#include "device/error.cuh"
+#include "constants.cuh"
+#include "errorDef.cuh"

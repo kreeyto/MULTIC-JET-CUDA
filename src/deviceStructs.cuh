@@ -9,6 +9,6 @@ struct LBMFields {
     float *f, *g;
 };
 
-extern LBMFields d;
+extern LBMFields lbm;
 
-void initializeVars();
+void initDeviceVars();

@@ -1,20 +1,56 @@
-#include "device/data.cuh"
+#pragma once
+using namespace std;
 
-__constant__ float CSSQ;
-__constant__ float OMEGA;
-__constant__ float SHARP_C;
-__constant__ float INTERFACE_WIDTH;
-__constant__ float SIGMA;
-__constant__ float W[NLINKS];
-__constant__ int CIX[NLINKS], CIY[NLINKS], CIZ[NLINKS];
+//#define RUN_MODE
+#define SAMPLE_MODE
+//#define DEBUG_MODE
+//#define PERTURBATION  
 
-#ifdef PERTURBATION
-    __constant__ float DATAZ[200];
+#define BLOCK_SIZE_X 8
+#define BLOCK_SIZE_Y 8
+#define BLOCK_SIZE_Z 8
+
+#ifdef D3Q19
+    constexpr int NLINKS = 19;
+#elif defined(D3Q27)
+    constexpr int NLINKS = 27;
 #endif
 
-LBMFields d;
+extern __constant__ float CSSQ;
+extern __constant__ float OMEGA;
+extern __constant__ float SHARP_C;
+extern __constant__ float INTERFACE_WIDTH;
+extern __constant__ float SIGMA;
+extern __constant__ float W[NLINKS];
+extern __constant__ int CIX[NLINKS], CIY[NLINKS], CIZ[NLINKS];
 
-// velocity set
+#ifdef PERTURBATION
+    extern __constant__ float DATAZ[200];
+#endif
+
+// domain size
+constexpr int MESH = 64;
+constexpr int DIAM = (MESH + 9) / 10;
+constexpr int NX = MESH;
+constexpr int NY = MESH;
+constexpr int NZ = MESH*4;
+
+// jet velocity
+constexpr float U_JET = 0.05f;
+
+// adimensional parameters
+constexpr int REYNOLDS = 5000;
+constexpr int WEBER = 500;
+
+// general model parameters
+constexpr float VISC = (U_JET * DIAM) / REYNOLDS;
+constexpr float H_TAU = 0.5f + 3.0f * VISC;
+constexpr float H_CSSQ = 1.0f / 3.0f;
+constexpr float H_OMEGA = 1.0f / H_TAU;
+constexpr float H_INTERFACE_WIDTH = 7.0f;
+constexpr float H_SHARP_C = 0.15f * H_INTERFACE_WIDTH;
+constexpr float H_SIGMA = (U_JET * U_JET * DIAM) / WEBER;
+
 #ifdef D3Q19
     constexpr int H_CIX[19] = { 0, 1, -1, 0, 0, 0, 0, 1, -1, 1, -1, 0, 0, 1, -1, 1, -1, 0, 0 };
     constexpr int H_CIY[19] = { 0, 0, 0, 1, -1, 0, 0, 1, -1, 0, 0, 1, -1, -1, 1, 0, 0, 1, -1 };
@@ -25,7 +61,6 @@ LBMFields d;
     constexpr int H_CIZ[27] = { 0, 0, 0, 0, 0, 1, -1, 0, 0, 1, -1, 1, -1, 0, 0, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1, -1 };
 #endif
 
-// vs weights
 #ifdef D3Q19
     constexpr float H_W[19] = {
         1.0f / 3.0f, 
@@ -64,53 +99,12 @@ LBMFields d;
                                     -0.00045545f, 0.00011635f, 0.00093167f, 0.00062180f, -0.00010542f, 0.00085383f, -0.00048304f, -0.00042307f, 0.00085464f, 0.00005302f, 
                                     -0.00070889f, 0.00045034f, 0.00002412f, -0.00016850f, 0.00014029f, 0.00036591f, -0.00049267f, 0.00049268f, -0.00012600f, -0.00017574f };
 #endif
-                                         
-// =============================================================================================================================================================== //
 
-void initializeVars() {
-    size_t SIZE = NX * NY * NZ * sizeof(float);            
-    size_t DIST_SIZE = NX * NY * NZ * NLINKS * sizeof(float); 
-
-    checkCudaErrors(cudaMalloc(&d.rho, SIZE));
-    checkCudaErrors(cudaMalloc(&d.phi, SIZE));
-    checkCudaErrors(cudaMalloc(&d.ux, SIZE));
-    checkCudaErrors(cudaMalloc(&d.uy, SIZE));
-    checkCudaErrors(cudaMalloc(&d.uz, SIZE));
-    checkCudaErrors(cudaMalloc(&d.normx, SIZE));
-    checkCudaErrors(cudaMalloc(&d.normy, SIZE));
-    checkCudaErrors(cudaMalloc(&d.normz, SIZE));
-    checkCudaErrors(cudaMalloc(&d.ffx, SIZE));
-    checkCudaErrors(cudaMalloc(&d.ffy, SIZE));
-    checkCudaErrors(cudaMalloc(&d.ffz, SIZE));
-    checkCudaErrors(cudaMalloc(&d.f, DIST_SIZE));
-    checkCudaErrors(cudaMalloc(&d.g, DIST_SIZE));
-
-    checkCudaErrors(cudaMemset(d.ux, 0, SIZE));
-    checkCudaErrors(cudaMemset(d.uy, 0, SIZE));
-    checkCudaErrors(cudaMemset(d.uz, 0, SIZE));
-    checkCudaErrors(cudaMemset(d.phi, 0, SIZE));
-    checkCudaErrors(cudaMemset(d.normx, 0, SIZE));
-    checkCudaErrors(cudaMemset(d.normy, 0, SIZE));
-    checkCudaErrors(cudaMemset(d.normz, 0, SIZE));
-    checkCudaErrors(cudaMemset(d.ffx, 0, SIZE));
-    checkCudaErrors(cudaMemset(d.ffy, 0, SIZE));
-    checkCudaErrors(cudaMemset(d.ffz, 0, SIZE));
-    checkCudaErrors(cudaMemset(d.g, 0, DIST_SIZE));
-
-    checkCudaErrors(cudaMemcpyToSymbol(CSSQ, &H_CSSQ, sizeof(float)));
-    checkCudaErrors(cudaMemcpyToSymbol(OMEGA, &H_OMEGA, sizeof(float)));
-    checkCudaErrors(cudaMemcpyToSymbol(SHARP_C, &H_SHARP_C, sizeof(float)));
-    checkCudaErrors(cudaMemcpyToSymbol(INTERFACE_WIDTH, &H_INTERFACE_WIDTH, sizeof(float)));
-    checkCudaErrors(cudaMemcpyToSymbol(SIGMA, &H_SIGMA, sizeof(float)));
-    checkCudaErrors(cudaMemcpyToSymbol(W, &H_W, NLINKS * sizeof(float)));
-    checkCudaErrors(cudaMemcpyToSymbol(CIX, &H_CIX, NLINKS * sizeof(int)));
-    checkCudaErrors(cudaMemcpyToSymbol(CIY, &H_CIY, NLINKS * sizeof(int)));
-    checkCudaErrors(cudaMemcpyToSymbol(CIZ, &H_CIZ, NLINKS * sizeof(int)));
-
-    #ifdef PERTURBATION
-        checkCudaErrors(cudaMemcpyToSymbol(DATAZ, &H_DATAZ, 200 * sizeof(float)));
-    #endif
-
-    getLastCudaError("initializeVars: post-initialization");
-}
+#ifdef RUN_MODE
+    constexpr int MACRO_SAVE = 100, NSTEPS = 25000;
+#elif defined(SAMPLE_MODE)
+    constexpr int MACRO_SAVE = 100, NSTEPS = 1000;
+#elif defined(DEBUG_MODE)
+    constexpr int MACRO_SAVE = 1, NSTEPS = 0;
+#endif
 
