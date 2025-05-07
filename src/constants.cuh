@@ -1,14 +1,14 @@
 #pragma once
 using namespace std;
 
-//#define RUN_MODE
-#define SAMPLE_MODE
+#define RUN_MODE
+//#define SAMPLE_MODE
 //#define DEBUG_MODE
-//#define PERTURBATION  
+#define PERTURBATION  
 
-#define BLOCK_SIZE_X 8
-#define BLOCK_SIZE_Y 8
-#define BLOCK_SIZE_Z 8
+#define BLOCK_SIZE_X 4
+#define BLOCK_SIZE_Y 4
+#define BLOCK_SIZE_Z 4
 
 #ifdef D3Q19
     constexpr int NLINKS = 19;
@@ -51,11 +51,11 @@ constexpr float H_INTERFACE_WIDTH = 7.0f;
 constexpr float H_SHARP_C = 0.15f * H_INTERFACE_WIDTH;
 constexpr float H_SIGMA = (U_JET * U_JET * DIAM) / WEBER;
 
-#ifdef D3Q19
+#ifdef D3Q19 //                 0  1   2  3  4  5  6  7   8  9  10 11 12 13  14 15  16 17  18  
     constexpr int H_CIX[19] = { 0, 1, -1, 0, 0, 0, 0, 1, -1, 1, -1, 0, 0, 1, -1, 1, -1, 0, 0 };
     constexpr int H_CIY[19] = { 0, 0, 0, 1, -1, 0, 0, 1, -1, 0, 0, 1, -1, -1, 1, 0, 0, 1, -1 };
     constexpr int H_CIZ[19] = { 0, 0, 0, 0, 0, 1, -1, 0, 0, 1, -1, 1, -1, 0, 0, -1, 1, -1, 1 };
-#elif defined(D3Q27)
+#elif defined(D3Q27) //         0  1   2  3  4  5  6  7   8  9  10 11 12 13  14 15  16 17 18  19 20  21 22  23  24  25 26
     constexpr int H_CIX[27] = { 0, 1, -1, 0, 0, 0, 0, 1, -1, 1, -1, 0, 0, 1, -1, 1, -1, 0, 0, 1, -1, 1, -1, 1, -1, -1, 1 };
     constexpr int H_CIY[27] = { 0, 0, 0, 1, -1, 0, 0, 1, -1, 0, 0, 1, -1, -1, 1, 0, 0, 1, -1, 1, -1, 1, -1, -1, 1, 1, -1 };
     constexpr int H_CIZ[27] = { 0, 0, 0, 0, 0, 1, -1, 0, 0, 1, -1, 1, -1, 0, 0, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1, -1 };

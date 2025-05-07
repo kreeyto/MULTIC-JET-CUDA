@@ -37,23 +37,44 @@ __global__ void gpuComputeInterface(LBMFields d) {
         z == 0 || z == NZ-1) return;
 
     const int idx3 = gpuIdxGlobal3(x,y,z);
-    float grad_phi_x = 3.0f * (W[1]  * d.phi[gpuIdxGlobal3(x+1,y,z)]   - W[2]  * d.phi[gpuIdxGlobal3(x-1,y,z)]
-                             + W[7]  * d.phi[gpuIdxGlobal3(x+1,y+1,z)] - W[8]  * d.phi[gpuIdxGlobal3(x-1,y-1,z)]
-                             + W[9]  * d.phi[gpuIdxGlobal3(x+1,y,z+1)] - W[10] * d.phi[gpuIdxGlobal3(x-1,y,z-1)]
-                             + W[13] * d.phi[gpuIdxGlobal3(x+1,y-1,z)] - W[14] * d.phi[gpuIdxGlobal3(x-1,y+1,z)]
-                             + W[15] * d.phi[gpuIdxGlobal3(x+1,y,z-1)] - W[16] * d.phi[gpuIdxGlobal3(x-1,y,z+1)]);
 
-    float grad_phi_y = 3.0f * (W[3]  * d.phi[gpuIdxGlobal3(x,y+1,z)]   - W[4]  * d.phi[gpuIdxGlobal3(x,y-1,z)]
-                             + W[7]  * d.phi[gpuIdxGlobal3(x+1,y+1,z)] - W[8]  * d.phi[gpuIdxGlobal3(x-1,y-1,z)]
-                             + W[11] * d.phi[gpuIdxGlobal3(x,y+1,z+1)] - W[12] * d.phi[gpuIdxGlobal3(x,y-1,z-1)]
-                             - W[13] * d.phi[gpuIdxGlobal3(x+1,y-1,z)] + W[14] * d.phi[gpuIdxGlobal3(x-1,y+1,z)]
-                             + W[17] * d.phi[gpuIdxGlobal3(x,y+1,z-1)] - W[18] * d.phi[gpuIdxGlobal3(x,y-1,z+1)]);
+    float w_sum_grad_x =  W[1]  * d.phi[gpuIdxGlobal3(x+1,y,z)]   - W[2]  * d.phi[gpuIdxGlobal3(x-1,y,z)]
+                        + W[7]  * d.phi[gpuIdxGlobal3(x+1,y+1,z)] - W[8]  * d.phi[gpuIdxGlobal3(x-1,y-1,z)]
+                        + W[9]  * d.phi[gpuIdxGlobal3(x+1,y,z+1)] - W[10] * d.phi[gpuIdxGlobal3(x-1,y,z-1)]
+                        + W[13] * d.phi[gpuIdxGlobal3(x+1,y-1,z)] - W[14] * d.phi[gpuIdxGlobal3(x-1,y+1,z)]
+                        + W[15] * d.phi[gpuIdxGlobal3(x+1,y,z-1)] - W[16] * d.phi[gpuIdxGlobal3(x-1,y,z+1)];
 
-    float grad_phi_z = 3.0f * (W[5]  * d.phi[gpuIdxGlobal3(x,y,z+1)]   - W[6]  * d.phi[gpuIdxGlobal3(x,y,z-1)]
-                             + W[9]  * d.phi[gpuIdxGlobal3(x+1,y,z+1)] - W[10] * d.phi[gpuIdxGlobal3(x-1,y,z-1)]
-                             + W[11] * d.phi[gpuIdxGlobal3(x,y+1,z+1)] - W[12] * d.phi[gpuIdxGlobal3(x,y-1,z-1)]
-                             - W[15] * d.phi[gpuIdxGlobal3(x+1,y,z-1)] + W[16] * d.phi[gpuIdxGlobal3(x-1,y,z+1)]
-                             - W[17] * d.phi[gpuIdxGlobal3(x,y+1,z-1)] + W[18] * d.phi[gpuIdxGlobal3(x,y-1,z+1)]);
+    float w_sum_grad_y =  W[3]  * d.phi[gpuIdxGlobal3(x,y+1,z)]   - W[4]  * d.phi[gpuIdxGlobal3(x,y-1,z)]
+                        + W[7]  * d.phi[gpuIdxGlobal3(x+1,y+1,z)] - W[8]  * d.phi[gpuIdxGlobal3(x-1,y-1,z)]
+                        + W[11] * d.phi[gpuIdxGlobal3(x,y+1,z+1)] - W[12] * d.phi[gpuIdxGlobal3(x,y-1,z-1)]
+                        + W[14] * d.phi[gpuIdxGlobal3(x-1,y+1,z)] - W[13] * d.phi[gpuIdxGlobal3(x+1,y-1,z)]
+                        + W[17] * d.phi[gpuIdxGlobal3(x,y+1,z-1)] - W[18] * d.phi[gpuIdxGlobal3(x,y-1,z+1)];
+
+    float w_sum_grad_z =  W[5]  * d.phi[gpuIdxGlobal3(x,y,z+1)]   - W[6]  * d.phi[gpuIdxGlobal3(x,y,z-1)]
+                        + W[9]  * d.phi[gpuIdxGlobal3(x+1,y,z+1)] - W[10] * d.phi[gpuIdxGlobal3(x-1,y,z-1)]
+                        + W[11] * d.phi[gpuIdxGlobal3(x,y+1,z+1)] - W[12] * d.phi[gpuIdxGlobal3(x,y-1,z-1)]
+                        + W[16] * d.phi[gpuIdxGlobal3(x-1,y,z+1)] - W[15] * d.phi[gpuIdxGlobal3(x+1,y,z-1)] 
+                        + W[18] * d.phi[gpuIdxGlobal3(x,y-1,z+1)] - W[17] * d.phi[gpuIdxGlobal3(x,y+1,z-1)];
+    #ifdef D3Q27
+    w_sum_grad_x +=   W[19] * d.phi[gpuIdxGlobal3(x+1,y+1,z+1)] - W[20] * d.phi[gpuIdxGlobal3(x-1,y-1,z-1)]
+                    + W[21] * d.phi[gpuIdxGlobal3(x+1,y+1,z-1)] - W[22] * d.phi[gpuIdxGlobal3(x-1,y-1,z+1)]
+                    + W[23] * d.phi[gpuIdxGlobal3(x+1,y-1,z+1)] - W[24] * d.phi[gpuIdxGlobal3(x-1,y+1,z-1)]
+                    + W[26] * d.phi[gpuIdxGlobal3(x+1,y-1,z-1)] - W[25] * d.phi[gpuIdxGlobal3(x-1,y+1,z+1)];
+
+    w_sum_grad_y +=   W[19] * d.phi[gpuIdxGlobal3(x+1,y+1,z+1)] - W[20] * d.phi[gpuIdxGlobal3(x-1,y-1,z-1)]
+                    + W[21] * d.phi[gpuIdxGlobal3(x+1,y+1,z-1)] - W[22] * d.phi[gpuIdxGlobal3(x-1,y-1,z+1)]
+                    + W[24] * d.phi[gpuIdxGlobal3(x-1,y+1,z-1)] - W[23] * d.phi[gpuIdxGlobal3(x+1,y-1,z+1)]
+                    + W[25] * d.phi[gpuIdxGlobal3(x-1,y+1,z+1)] - W[26] * d.phi[gpuIdxGlobal3(x+1,y-1,z-1)];
+
+    w_sum_grad_z +=   W[19] * d.phi[gpuIdxGlobal3(x+1,y+1,z+1)] - W[20] * d.phi[gpuIdxGlobal3(x-1,y-1,z-1)]
+                    + W[22] * d.phi[gpuIdxGlobal3(x-1,y-1,z+1)] - W[21] * d.phi[gpuIdxGlobal3(x+1,y+1,z-1)]
+                    + W[23] * d.phi[gpuIdxGlobal3(x+1,y-1,z+1)] - W[24] * d.phi[gpuIdxGlobal3(x-1,y+1,z-1)]
+                    + W[25] * d.phi[gpuIdxGlobal3(x-1,y+1,z+1)] - W[26] * d.phi[gpuIdxGlobal3(x+1,y-1,z-1)];
+    #endif // D3Q27
+        
+    float grad_phi_x = 3.0f * w_sum_grad_x;
+    float grad_phi_y = 3.0f * w_sum_grad_y;
+    float grad_phi_z = 3.0f * w_sum_grad_z;
 
     float squared = grad_phi_x*grad_phi_x + grad_phi_y*grad_phi_y + grad_phi_z*grad_phi_z;
     float mag = rsqrtf(fmaxf(squared,1e-9));
@@ -66,21 +87,23 @@ __global__ void gpuComputeInterface(LBMFields d) {
     d.normy[idx3] = normy_val;
     d.normz[idx3] = normz_val;
 
-    float curvature = -3.0f * (W[1]  *  d.normx[gpuIdxGlobal3(x+1,y,z)] - W[2] * d.normx[gpuIdxGlobal3(x-1,y,z)]
-                             + W[3]  *  d.normy[gpuIdxGlobal3(x,y+1,z)] - W[4] * d.normy[gpuIdxGlobal3(x,y-1,z)]
-                             + W[5]  *  d.normz[gpuIdxGlobal3(x,y,z+1)] - W[6] * d.normz[gpuIdxGlobal3(x,y,z-1)]
-                             + W[7]  * (d.normx[gpuIdxGlobal3(x+1,y+1,z)] + d.normy[gpuIdxGlobal3(x+1,y+1,z)])
-                             - W[8]  * (d.normx[gpuIdxGlobal3(x-1,y-1,z)] + d.normy[gpuIdxGlobal3(x-1,y-1,z)])
-                             + W[9]  * (d.normx[gpuIdxGlobal3(x+1,y,z+1)] + d.normz[gpuIdxGlobal3(x+1,y,z+1)])
-                             - W[10] * (d.normx[gpuIdxGlobal3(x-1,y,z+1)] + d.normz[gpuIdxGlobal3(x-1,y,z+1)])
-                             + W[11] * (d.normy[gpuIdxGlobal3(x,y+1,z+1)] + d.normz[gpuIdxGlobal3(x,y+1,z+1)])
-                             - W[12] * (d.normy[gpuIdxGlobal3(x,y-1,z+1)] + d.normz[gpuIdxGlobal3(x,y-1,z+1)])
-                             + W[13] * (d.normx[gpuIdxGlobal3(x+1,y-1,z)] - d.normy[gpuIdxGlobal3(x+1,y-1,z)])
-                             - W[14] * (d.normx[gpuIdxGlobal3(x-1,y+1,z)] - d.normy[gpuIdxGlobal3(x-1,y+1,z)])
-                             + W[15] * (d.normx[gpuIdxGlobal3(x+1,y,z-1)] - d.normz[gpuIdxGlobal3(x+1,y,z-1)])
-                             - W[16] * (d.normx[gpuIdxGlobal3(x-1,y,z-1)] - d.normz[gpuIdxGlobal3(x-1,y,z-1)])
-                             + W[17] * (d.normy[gpuIdxGlobal3(x,y+1,z-1)] - d.normz[gpuIdxGlobal3(x,y+1,z-1)])
-                             - W[18] * (d.normy[gpuIdxGlobal3(x,y-1,z+1)] - d.normz[gpuIdxGlobal3(x,y-1,z+1)]));   
+    float w_sum_curv =  W[1]  *  d.normx[gpuIdxGlobal3(x+1,y,z)]                                        - W[2]  *  d.normx[gpuIdxGlobal3(x-1,y,z)]
+                      + W[3]  *  d.normy[gpuIdxGlobal3(x,y+1,z)]                                        - W[4]  *  d.normy[gpuIdxGlobal3(x,y-1,z)]
+                      + W[5]  *  d.normz[gpuIdxGlobal3(x,y,z+1)]                                        - W[6]  *  d.normz[gpuIdxGlobal3(x,y,z-1)]
+                      + W[7]  * (d.normx[gpuIdxGlobal3(x+1,y+1,z)] + d.normy[gpuIdxGlobal3(x+1,y+1,z)]) - W[8]  * (d.normx[gpuIdxGlobal3(x-1,y-1,z)] + d.normy[gpuIdxGlobal3(x-1,y-1,z)])
+                      + W[9]  * (d.normx[gpuIdxGlobal3(x+1,y,z+1)] + d.normz[gpuIdxGlobal3(x+1,y,z+1)]) - W[10] * (d.normx[gpuIdxGlobal3(x-1,y,z+1)] + d.normz[gpuIdxGlobal3(x-1,y,z+1)])
+                      + W[11] * (d.normy[gpuIdxGlobal3(x,y+1,z+1)] + d.normz[gpuIdxGlobal3(x,y+1,z+1)]) - W[12] * (d.normy[gpuIdxGlobal3(x,y-1,z+1)] + d.normz[gpuIdxGlobal3(x,y-1,z+1)])
+                      + W[13] * (d.normx[gpuIdxGlobal3(x+1,y-1,z)] - d.normy[gpuIdxGlobal3(x+1,y-1,z)]) - W[14] * (d.normx[gpuIdxGlobal3(x-1,y+1,z)] - d.normy[gpuIdxGlobal3(x-1,y+1,z)])
+                      + W[15] * (d.normx[gpuIdxGlobal3(x+1,y,z-1)] - d.normz[gpuIdxGlobal3(x+1,y,z-1)]) - W[16] * (d.normx[gpuIdxGlobal3(x-1,y,z-1)] - d.normz[gpuIdxGlobal3(x-1,y,z-1)])
+                      + W[17] * (d.normy[gpuIdxGlobal3(x,y+1,z-1)] - d.normz[gpuIdxGlobal3(x,y+1,z-1)]) - W[18] * (d.normy[gpuIdxGlobal3(x,y-1,z+1)] - d.normz[gpuIdxGlobal3(x,y-1,z+1)]);
+    #ifdef D3Q27
+    w_sum_curv +=   W[19] * (d.normx[gpuIdxGlobal3(x+1,y+1,z+1)] + d.normy[gpuIdxGlobal3(x+1,y+1,z+1)] + d.normz[gpuIdxGlobal3(x+1,y+1,z+1)]) - W[20] * (d.normx[gpuIdxGlobal3(x-1,y-1,z-1)] + d.normy[gpuIdxGlobal3(x-1,y-1,z-1)] + d.normz[gpuIdxGlobal3(x-1,y-1,z-1)])
+                  + W[21] * (d.normx[gpuIdxGlobal3(x+1,y+1,z-1)] + d.normy[gpuIdxGlobal3(x+1,y+1,z-1)] - d.normz[gpuIdxGlobal3(x+1,y+1,z-1)]) - W[22] * (d.normx[gpuIdxGlobal3(x-1,y-1,z+1)] + d.normy[gpuIdxGlobal3(x-1,y-1,z+1)] - d.normz[gpuIdxGlobal3(x-1,y-1,z+1)])
+                  + W[23] * (d.normx[gpuIdxGlobal3(x+1,y-1,z+1)] - d.normy[gpuIdxGlobal3(x+1,y-1,z+1)] + d.normz[gpuIdxGlobal3(x+1,y-1,z+1)]) - W[24] * (d.normx[gpuIdxGlobal3(x-1,y+1,z-1)] - d.normy[gpuIdxGlobal3(x-1,y+1,z-1)] + d.normz[gpuIdxGlobal3(x-1,y+1,z-1)])
+                  + W[26] * (d.normx[gpuIdxGlobal3(x+1,y-1,z-1)] - d.normy[gpuIdxGlobal3(x+1,y-1,z-1)] - d.normz[gpuIdxGlobal3(x+1,y-1,z-1)]) - W[25] * (d.normx[gpuIdxGlobal3(x-1,y+1,z+1)] - d.normy[gpuIdxGlobal3(x-1,y+1,z+1)] - d.normz[gpuIdxGlobal3(x-1,y+1,z+1)]);
+    #endif // D3Q27
+
+    float curvature = -3.0f * w_sum_curv;   
 
     float coeff_curv = SIGMA * curvature;
     d.ffx[idx3] = coeff_curv * normx_val * ind_val;

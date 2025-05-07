@@ -21,7 +21,7 @@ __global__ void gpuApplyInflowBoundary(LBMFields d, const int STEP) {
     float phi_in = smoothing_factor;
 
     #ifdef PERTURBATION
-        float uz_in = U_JET * (1.0f + DATAZ[STEP/MACRO_SAVE] * 10) * phi_in; 
+        float uz_in = U_JET * (1.0f + DATAZ[STEP/MACRO_SAVE] * 100) * phi_in; 
     #else
         float uz_in = U_JET * phi_in; 
     #endif
