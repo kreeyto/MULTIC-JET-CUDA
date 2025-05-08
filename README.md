@@ -31,7 +31,6 @@ Post-processed results are exported as `.vtr` files for visualization in **ParaV
 | `compile.sh`      | Script to compile the simulator binary |
 | `pipeline.sh`     | Unified execution script: compile → simulate → post-process |
 | `bin/`            | Stores compiled binaries and results |
-| `post.sh`         | Executes VTK generation for saved steps |
 
 ---
 
