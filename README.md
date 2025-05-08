@@ -97,7 +97,7 @@ The post-processing workflow is shared with https://github.com/CERNN/MR-LBM. It 
 | `lbm.cu`                | Main LBM algorithm (collision, streaming, evolution)   |
 | `interface.cu`          | Phase field and surface tension interface calculations |
 | `boundaryConditions.cu` | Inflow conditions using radial smooth profiles         |
-| `hostFunctions.cu/h`    | Data saving and simulation metadata creation           |
+| `hostFunctions.cuh`    | Data saving and simulation metadata creation           |
 | `deviceFunctions.cuh`   | GPU helpers (indexing, equilibrium calculations)       |
 | `errorDef.cuh`          | CUDA error handling wrappers                           |
 
