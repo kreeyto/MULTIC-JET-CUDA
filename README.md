@@ -129,6 +129,12 @@ This compiles, runs the simulation, and generates `.vtr` files in `bin/D3Q19/000
 
 ---
 
+## 🧠 Project Context
+
+This code was developed as part of an undergraduate research fellowship at the Geoenergia Lab (UDESC - Balneário Camboriú Campus), under the project:
+
+**"Numerical Modeling of Oil in the Sea Based on Chemical and Mechanical Subsea Dispersion Experiments (SUBJET)"**, in partnership with **Petrobras**.
+
 ## 📬 Contact
 
 For feature requests or contributions, feel free to open an issue or fork the project. You may also contact the maintainer via email at:
