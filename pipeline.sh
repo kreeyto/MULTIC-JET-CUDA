@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# Cores para mensagens
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -8,13 +7,10 @@ YELLOW='\033[0;33m'
 CYAN='\033[0;36m'
 RESET='\033[0m'
 
-# Arquitetura CUDA
 GPU_ARCH=86
 
-# Detectar sistema operacional
 OS_TYPE=$(uname -s)
 
-# Função principal para ambos os sistemas
 run_pipeline() {
     local VELOCITY_SET=$1
     local ID=$2
@@ -76,5 +72,4 @@ run_pipeline() {
     echo -e "${GREEN}Processo concluído com sucesso!${RESET}"
 }
 
-# Invocar função
 run_pipeline "$1" "$2"
