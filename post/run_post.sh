@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [ "$#" -lt 2 ]; then
-    echo "Uso: ./post.sh <ID> <velocity_set>"
+    echo "Usage: ./post.sh <ID> <velocity_set>"
     exit 1
 fi
 
@@ -13,8 +13,8 @@ if [[ "$OSTYPE" == "linux-gnu"* ]]; then
 elif [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]]; then
     PYTHON_CMD="python"
 else
-    echo "Sistema operacional não reconhecido. Tentando python por padrão."
+    echo "Operating system not recognized. Trying python by default."
     PYTHON_CMD="python"
 fi
 
-$PYTHON_CMD exampleVTK.py "$ID" "$VELOCITY_SET"
+$PYTHON_CMD process_steps.py "$ID" "$VELOCITY_SET"

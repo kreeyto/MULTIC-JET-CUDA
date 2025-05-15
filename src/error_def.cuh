@@ -4,20 +4,16 @@
 #define getLastCudaError(msg)  __getLastCudaError(msg,__FILE__,__LINE__)
 #define checkCurandStatus(status) __checkCurandStatus(status, __FILE__, __LINE__)
 
-inline void __checkCurandStatus(curandStatus_t status, const char* const file, const int line)
-{
-    if (status != CURAND_STATUS_SUCCESS)
-    {
+inline void __checkCurandStatus(curandStatus_t status, const char* const file, const int line) {
+    if (status != CURAND_STATUS_SUCCESS) {
         printf("Curand error at %s(%d)\n", __FILE__, __LINE__); fflush(stdout);
         exit(-1);
     }
 }
 
 
-inline void __checkCudaErrors(cudaError_t err, const char* const func, const char* const file, const int line)
-{
-    if (err != cudaSuccess)
-    {
+inline void __checkCudaErrors(cudaError_t err, const char* const func, const char* const file, const int line) {
+    if (err != cudaSuccess) {
         fprintf(stderr, "CUDA error at %s(%d)\"%s\": [%d] %s.\n",
             file, line, func, (int)err, cudaGetErrorString(err)); fflush(stderr);
         exit(-1);
@@ -25,8 +21,7 @@ inline void __checkCudaErrors(cudaError_t err, const char* const func, const cha
 }
 
 
-inline void __getLastCudaError(const char* const errorMessage, const char* const file, const int line)
-{
+inline void __getLastCudaError(const char* const errorMessage, const char* const file, const int line) {
     cudaError_t err = cudaGetLastError();
     if (err != cudaSuccess) {
         fprintf(stderr, "CUDA error at %s(%d): [%d] %s.\n",

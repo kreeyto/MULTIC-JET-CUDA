@@ -1,5 +1,3 @@
-#include "deviceStructs.cuh"
-#include "deviceFunctions.cuh"
 #include "kernels.cuh"
 
 __global__ void gpuInitDistributions(LBMFields d) {
@@ -18,9 +16,10 @@ __global__ void gpuInitDistributions(LBMFields d) {
 
 __constant__ float CSSQ;
 __constant__ float OMEGA;
-__constant__ float SHARP_C;
-__constant__ float INTERFACE_WIDTH;
+__constant__ float GAMMA;
 __constant__ float SIGMA;
+__constant__ float COEFF_HE;
+
 __constant__ float W[NLINKS];
 __constant__ int CIX[NLINKS], CIY[NLINKS], CIZ[NLINKS];
 
@@ -44,12 +43,14 @@ void initDeviceVars() {
     checkCudaErrors(cudaMalloc(&lbm.normx, SIZE));
     checkCudaErrors(cudaMalloc(&lbm.normy, SIZE));
     checkCudaErrors(cudaMalloc(&lbm.normz, SIZE));
+    checkCudaErrors(cudaMalloc(&lbm.ind, SIZE));
     checkCudaErrors(cudaMalloc(&lbm.ffx, SIZE));
     checkCudaErrors(cudaMalloc(&lbm.ffy, SIZE));
     checkCudaErrors(cudaMalloc(&lbm.ffz, SIZE));
     checkCudaErrors(cudaMalloc(&lbm.f, DIST_SIZE));
     checkCudaErrors(cudaMalloc(&lbm.g, DIST_SIZE));
 
+    /*
     checkCudaErrors(cudaMemset(lbm.ux, 0, SIZE));
     checkCudaErrors(cudaMemset(lbm.uy, 0, SIZE));
     checkCudaErrors(cudaMemset(lbm.uz, 0, SIZE));
@@ -61,12 +62,14 @@ void initDeviceVars() {
     checkCudaErrors(cudaMemset(lbm.ffy, 0, SIZE));
     checkCudaErrors(cudaMemset(lbm.ffz, 0, SIZE));
     checkCudaErrors(cudaMemset(lbm.g, 0, DIST_SIZE));
+    */
 
     checkCudaErrors(cudaMemcpyToSymbol(CSSQ, &H_CSSQ, sizeof(float)));
     checkCudaErrors(cudaMemcpyToSymbol(OMEGA, &H_OMEGA, sizeof(float)));
-    checkCudaErrors(cudaMemcpyToSymbol(SHARP_C, &H_SHARP_C, sizeof(float)));
-    checkCudaErrors(cudaMemcpyToSymbol(INTERFACE_WIDTH, &H_INTERFACE_WIDTH, sizeof(float)));
+    checkCudaErrors(cudaMemcpyToSymbol(GAMMA, &H_GAMMA, sizeof(float)));
     checkCudaErrors(cudaMemcpyToSymbol(SIGMA, &H_SIGMA, sizeof(float)));
+    checkCudaErrors(cudaMemcpyToSymbol(COEFF_HE, &H_COEFF_HE, sizeof(float)));
+
     checkCudaErrors(cudaMemcpyToSymbol(W, &H_W, NLINKS * sizeof(float)));
     checkCudaErrors(cudaMemcpyToSymbol(CIX, &H_CIX, NLINKS * sizeof(int)));
     checkCudaErrors(cudaMemcpyToSymbol(CIY, &H_CIY, NLINKS * sizeof(int)));

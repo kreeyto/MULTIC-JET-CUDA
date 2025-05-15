@@ -5,7 +5,7 @@ VELOCITY_SET=$1
 ID=$2
 
 if [ -z "$VELOCITY_SET" ] || [ -z "$ID" ]; then
-    echo "Uso: ./compile.sh <VELOCITY_SET> <ID>"
+    echo "Usage: ./compile.sh <VELOCITY_SET> <ID>"
     exit 1
 fi
 
@@ -16,24 +16,23 @@ EXECUTABLE="${OUTPUT_DIR}/${ID}sim_${VELOCITY_SET}_sm${CC}"
 
 mkdir -p "${OUTPUT_DIR}"
 
-echo "Compilando para ${EXECUTABLE}..."
+echo "Compiling to ${EXECUTABLE}..."
 
 nvcc -O3 --restrict \
      -gencode arch=compute_${CC},code=sm_${CC} \
      -rdc=true --ptxas-options=-v \
      -I"${SRC_DIR}" \
      "${SRC_DIR}/main.cu" \
-     "${SRC_DIR}/interface.cu" \
+     "${SRC_DIR}/lbm_int.cu" \
      "${SRC_DIR}/lbm.cu" \
-     "${SRC_DIR}/boundaryConditions.cu" \
-     "${SRC_DIR}/deviceSetup.cu" \
-     "${SRC_DIR}/hostFunctions.cu" \
-     -lcudadevrt -lcurand -D${VELOCITY_SET} \
+     "${SRC_DIR}/lbm_bcs.cu" \
+     "${SRC_DIR}/device_setup.cu" \
+     -lcudadevrt -lcurand -maxrregcount=91 -D${VELOCITY_SET} \
      -o "${EXECUTABLE}"
 
 if [ $? -eq 0 ]; then
-    echo "Compilação concluída com sucesso: ${OUTPUT_DIR}/${EXECUTABLE_NAME}"
+    echo "Compilation completed successfully: ${OUTPUT_DIR}/${EXECUTABLE_NAME}"
 else
-    echo "Erro na compilação!"
+    echo "Compilation error!"
     exit 1
 fi

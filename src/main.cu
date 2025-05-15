@@ -1,40 +1,19 @@
 #include "kernels.cuh"
-#include "hostFunctions.cuh"
-#include "deviceStructs.cuh"
+#include "host_functions.cuh"
 
 int main(int argc, char* argv[]) {
-    auto START_TIME = chrono::high_resolution_clock::now();
     if (argc < 3) {
-        cerr << "Erro: Uso: " << argv[0] << " <velocity set> <ID>" << endl;
+        cerr << "Error: Usage: " << argv[0] << " <velocity set> <ID>" << endl;
         return 1;
     }
     string VELOCITY_SET = argv[1];
-    string ID = argv[2];
+    string SIM_ID = argv[2];
 
-    string BASE_DIR;   
-    #ifdef _WIN32
-        BASE_DIR = ".\\";
-    #else
-        BASE_DIR = "./";
-    #endif
-    string MODEL_DIR = BASE_DIR + "bin/" + VELOCITY_SET + "/";
-    string SIM_DIR = MODEL_DIR + ID + "/";
-    
-    #ifdef _WIN32
-        string MKDIR_COMMAND = "mkdir \"" + SIM_DIR + "\"";
-    #else
-        string MKDIR_COMMAND = "mkdir -p \"" + SIM_DIR + "\"";
-    #endif
-    
-    int ret = system(MKDIR_COMMAND.c_str());
-    (void)ret;
-
-    // ============================================================================================================================================================= //
-
+    string SIM_DIR = createSimulationDirectory(VELOCITY_SET,SIM_ID);
+    computeAndPrintOccupancy();
     initDeviceVars();
 
-    string INFO_FILE = SIM_DIR + ID + "_info.txt";
-    generateSimulationInfoFile(INFO_FILE, MACRO_SAVE, NSTEPS, H_TAU, ID, VELOCITY_SET);
+    // ================================================================================================== //
 
     dim3 threadsPerBlock(BLOCK_SIZE_X,BLOCK_SIZE_Y,BLOCK_SIZE_Z);
     dim3 numBlocks((NX + threadsPerBlock.x - 1) / threadsPerBlock.x,
@@ -42,8 +21,8 @@ int main(int argc, char* argv[]) {
                    (NZ + threadsPerBlock.z - 1) / threadsPerBlock.z);
 
     dim3 threadsPerBlockBC(BLOCK_SIZE_X*2,BLOCK_SIZE_Y*2);  
-    dim3 numBlocksBC((NX + threadsPerBlock.x - 1) / threadsPerBlock.x,
-                     (NY + threadsPerBlock.y - 1) / threadsPerBlock.y);    
+    dim3 numBlocksBC((NX + threadsPerBlockBC.x - 1) / threadsPerBlockBC.x,
+                     (NY + threadsPerBlockBC.y - 1) / threadsPerBlockBC.y);    
 
     cudaStream_t mainStream;
     checkCudaErrors(cudaStreamCreate(&mainStream));
@@ -52,8 +31,9 @@ int main(int argc, char* argv[]) {
     getLastCudaError("gpuInitDistributions");
 
     vector<float> phi_host(NX * NY * NZ); 
-    vector<float> uz_host(NX * NY * NZ);
+    //vector<float> uz_host(NX * NY * NZ);
 
+    auto START_TIME = chrono::high_resolution_clock::now();
     for (int STEP = 0; STEP <= NSTEPS ; ++STEP) {
         cout << "Passo " << STEP << " de " << NSTEPS << " iniciado..." << endl;
 
@@ -62,8 +42,10 @@ int main(int argc, char* argv[]) {
             gpuComputePhaseField<<<numBlocks,threadsPerBlock,0,mainStream>>> (lbm); 
             getLastCudaError("gpuComputePhaseField");
 
-            gpuComputeInterface<<<numBlocks,threadsPerBlock,0,mainStream>>> (lbm); 
-            getLastCudaError("gpuComputeInterface");
+            gpuComputeGradients<<<numBlocks,threadsPerBlock,0,mainStream>>> (lbm); 
+            getLastCudaError("gpuComputeGradients");
+            gpuComputeCurvature<<<numBlocks,threadsPerBlock,0,mainStream>>> (lbm); 
+            getLastCudaError("gpuComputeCurvature");
 
         // ======================================================== // 
 
@@ -74,8 +56,11 @@ int main(int argc, char* argv[]) {
             gpuFusedCollisionStream<<<numBlocks,threadsPerBlock,0,mainStream>>> (lbm); 
             getLastCudaError("gpuFusedCollisionStream");
 
-            gpuEvolveScalarField<<<numBlocks,threadsPerBlock,0,mainStream>>> (lbm); 
-            getLastCudaError("gpuEvolveScalarField");
+            gpuApplyOutflow<<<numBlocksBC,threadsPerBlockBC,0,mainStream>>> (lbm);
+            getLastCudaError("gpuApplyOutflow");
+
+            gpuEvolvePhaseField<<<numBlocks,threadsPerBlock,0,mainStream>>> (lbm); 
+            getLastCudaError("gpuEvolvePhaseField");
 
         // =============================================================== //    
 
@@ -83,8 +68,8 @@ int main(int argc, char* argv[]) {
     
         // ========================================== BOUNDARY ========================================== //
 
-            gpuApplyInflowBoundary<<<numBlocksBC,threadsPerBlockBC,0,mainStream>>> (lbm,STEP); 
-            getLastCudaError("gpuApplyInflowBoundary");
+            gpuApplyInflow<<<numBlocksBC,threadsPerBlockBC,0,mainStream>>> (lbm,STEP); 
+            getLastCudaError("gpuApplyInflow");
 
         // ============================================================================================= //
 
@@ -92,39 +77,31 @@ int main(int argc, char* argv[]) {
 
         if (STEP % MACRO_SAVE == 0) {
 
-            copyAndSaveToBinary(lbm.phi, NX * NY * NZ, SIM_DIR, ID, STEP, "phi");
-            copyAndSaveToBinary(lbm.uz, NX * NY * NZ, SIM_DIR, ID, STEP, "uz");
+            copyAndSaveToBinary(lbm.phi, NX * NY * NZ, SIM_DIR, SIM_ID, STEP, "phi");
+            //copyAndSaveToBinary(lbm.uz, NX * NY * NZ, SIM_DIR, SIM_ID, STEP, "uz");
 
             cout << "Passo " << STEP << ": Dados salvos em " << SIM_DIR << endl;
         }
     }
+    auto END_TIME = chrono::high_resolution_clock::now();
 
     checkCudaErrors(cudaStreamDestroy(mainStream));
+    cudaFree(lbm.f); cudaFree(lbm.g);
+    cudaFree(lbm.phi); cudaFree(lbm.rho);
+    cudaFree(lbm.ux); cudaFree(lbm.uy); cudaFree(lbm.uz);
+    cudaFree(lbm.normx); cudaFree(lbm.normy); cudaFree(lbm.normz);
+    cudaFree(lbm.ffx); cudaFree(lbm.ffy); cudaFree(lbm.ffz); cudaFree(lbm.ind);
 
-    cudaFree(lbm.f);
-    cudaFree(lbm.g);
-    cudaFree(lbm.phi);
-    cudaFree(lbm.rho);
-    cudaFree(lbm.ux);
-    cudaFree(lbm.uy);
-    cudaFree(lbm.uz);
-    cudaFree(lbm.normx);
-    cudaFree(lbm.normy);
-    cudaFree(lbm.normz);
-    cudaFree(lbm.ffx);
-    cudaFree(lbm.ffy);
-    cudaFree(lbm.ffz);
-
-    auto END_TIME = chrono::high_resolution_clock::now();
     chrono::duration<double> ELAPSED_TIME = END_TIME - START_TIME;
     long long TOTAL_CELLS = static_cast<long long>(NX) * NY * NZ * NSTEPS;
     double MLUPS = static_cast<double>(TOTAL_CELLS) / (ELAPSED_TIME.count() * 1e6);
 
     cout << "\n// =============================================== //\n";
-    cout << "     Tempo total de execução: " << ELAPSED_TIME.count() << " segundos\n";
-    cout << "     Desempenho: " << MLUPS << " MLUPS\n";
+    cout << "     Total execution time    : " << ELAPSED_TIME.count() << " seconds\n";
+    cout << "     Performance             : " << MLUPS << " MLUPS\n";
     cout << "// =============================================== //\n" << endl;
 
+    generateSimulationInfoFile(SIM_DIR,SIM_ID,VELOCITY_SET,NSTEPS,MACRO_SAVE,H_TAU,MLUPS);
     getLastCudaError("Final sync");
     return 0;
 }

@@ -16,4 +16,4 @@
 #include <builtin_types.h>
 #include <math.h>
 #include "constants.cuh"
-#include "errorDef.cuh"
+#include "error_def.cuh"

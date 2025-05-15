@@ -4,9 +4,9 @@
 struct LBMFields {
     float *rho, *phi;
     float *ux, *uy, *uz;
-    float *normx, *normy, *normz;
+    float *normx, *normy, *normz, *ind;
     float *ffx, *ffy, *ffz;
-    float *f, *g;
+    float *f, *g; 
 };
 
 extern LBMFields lbm;
