@@ -7,8 +7,8 @@ __global__ void gpuInitDistributions(LBMFields d) {
 
     if (x >= NX || y >= NY || z >= NZ) return;
 
-    #pragma unroll NLINKS
-    for (int Q = 0; Q < NLINKS; ++Q) {
+    #pragma unroll FLINKS
+    for (int Q = 0; Q < FLINKS; ++Q) {
         const int idx4 = gpuIdxGlobal4(x,y,z,Q);
         d.f[idx4] = W[Q];
     }
@@ -20,8 +20,11 @@ __constant__ float GAMMA;
 __constant__ float SIGMA;
 __constant__ float COEFF_HE;
 
-__constant__ float W[NLINKS];
-__constant__ int CIX[NLINKS], CIY[NLINKS], CIZ[NLINKS];
+__constant__ float W[FLINKS];
+__constant__ float W_G[GLINKS];
+
+__constant__ int CIX[FLINKS],   CIY[FLINKS],   CIZ[FLINKS];
+__constant__ int CIX_G[GLINKS], CIY_G[GLINKS], CIZ_G[GLINKS];
 
 #ifdef PERTURBATION
     __constant__ float DATAZ[200];
@@ -32,23 +35,24 @@ LBMFields lbm;
 // =============================================================================================================================================================== //
 
 void initDeviceVars() {
-    size_t SIZE = NX * NY * NZ * sizeof(float);            
-    size_t DIST_SIZE = NX * NY * NZ * NLINKS * sizeof(float); 
+    size_t SIZE =        NX * NY * NZ          * sizeof(float);            
+    size_t F_DIST_SIZE = NX * NY * NZ * FLINKS * sizeof(float); 
+    size_t G_DIST_SIZE = NX * NY * NZ * GLINKS * sizeof(float); 
 
-    checkCudaErrors(cudaMalloc(&lbm.phi, SIZE));
-    checkCudaErrors(cudaMalloc(&lbm.rho, SIZE));
-    checkCudaErrors(cudaMalloc(&lbm.ux, SIZE));
-    checkCudaErrors(cudaMalloc(&lbm.uy, SIZE));
-    checkCudaErrors(cudaMalloc(&lbm.uz, SIZE));
+    checkCudaErrors(cudaMalloc(&lbm.phi,   SIZE));
+    checkCudaErrors(cudaMalloc(&lbm.rho,   SIZE));
+    checkCudaErrors(cudaMalloc(&lbm.ux,    SIZE));
+    checkCudaErrors(cudaMalloc(&lbm.uy,    SIZE));
+    checkCudaErrors(cudaMalloc(&lbm.uz,    SIZE));
     checkCudaErrors(cudaMalloc(&lbm.normx, SIZE));
     checkCudaErrors(cudaMalloc(&lbm.normy, SIZE));
     checkCudaErrors(cudaMalloc(&lbm.normz, SIZE));
-    checkCudaErrors(cudaMalloc(&lbm.ind, SIZE));
-    checkCudaErrors(cudaMalloc(&lbm.ffx, SIZE));
-    checkCudaErrors(cudaMalloc(&lbm.ffy, SIZE));
-    checkCudaErrors(cudaMalloc(&lbm.ffz, SIZE));
-    checkCudaErrors(cudaMalloc(&lbm.f, DIST_SIZE));
-    checkCudaErrors(cudaMalloc(&lbm.g, DIST_SIZE));
+    checkCudaErrors(cudaMalloc(&lbm.ind,   SIZE));
+    checkCudaErrors(cudaMalloc(&lbm.ffx,   SIZE));
+    checkCudaErrors(cudaMalloc(&lbm.ffy,   SIZE));
+    checkCudaErrors(cudaMalloc(&lbm.ffz,   SIZE));
+    checkCudaErrors(cudaMalloc(&lbm.f,     F_DIST_SIZE));
+    checkCudaErrors(cudaMalloc(&lbm.g,     G_DIST_SIZE));
 
     /*
     checkCudaErrors(cudaMemset(lbm.ux, 0, SIZE));
@@ -61,19 +65,24 @@ void initDeviceVars() {
     checkCudaErrors(cudaMemset(lbm.ffx, 0, SIZE));
     checkCudaErrors(cudaMemset(lbm.ffy, 0, SIZE));
     checkCudaErrors(cudaMemset(lbm.ffz, 0, SIZE));
-    checkCudaErrors(cudaMemset(lbm.g, 0, DIST_SIZE));
+    checkCudaErrors(cudaMemset(lbm.g, 0, G_DIST_SIZE));
     */
 
-    checkCudaErrors(cudaMemcpyToSymbol(CSSQ, &H_CSSQ, sizeof(float)));
-    checkCudaErrors(cudaMemcpyToSymbol(OMEGA, &H_OMEGA, sizeof(float)));
-    checkCudaErrors(cudaMemcpyToSymbol(GAMMA, &H_GAMMA, sizeof(float)));
-    checkCudaErrors(cudaMemcpyToSymbol(SIGMA, &H_SIGMA, sizeof(float)));
+    checkCudaErrors(cudaMemcpyToSymbol(CSSQ,     &H_CSSQ,     sizeof(float)));
+    checkCudaErrors(cudaMemcpyToSymbol(OMEGA,    &H_OMEGA,    sizeof(float)));
+    checkCudaErrors(cudaMemcpyToSymbol(GAMMA,    &H_GAMMA,    sizeof(float)));
+    checkCudaErrors(cudaMemcpyToSymbol(SIGMA,    &H_SIGMA,    sizeof(float)));
     checkCudaErrors(cudaMemcpyToSymbol(COEFF_HE, &H_COEFF_HE, sizeof(float)));
 
-    checkCudaErrors(cudaMemcpyToSymbol(W, &H_W, NLINKS * sizeof(float)));
-    checkCudaErrors(cudaMemcpyToSymbol(CIX, &H_CIX, NLINKS * sizeof(int)));
-    checkCudaErrors(cudaMemcpyToSymbol(CIY, &H_CIY, NLINKS * sizeof(int)));
-    checkCudaErrors(cudaMemcpyToSymbol(CIZ, &H_CIZ, NLINKS * sizeof(int)));
+    checkCudaErrors(cudaMemcpyToSymbol(W,   &H_W,   FLINKS * sizeof(float)));
+    checkCudaErrors(cudaMemcpyToSymbol(W_G, &H_W_G, GLINKS * sizeof(float)));
+
+    checkCudaErrors(cudaMemcpyToSymbol(CIX,   &H_CIX,   FLINKS * sizeof(int)));
+    checkCudaErrors(cudaMemcpyToSymbol(CIY,   &H_CIY,   FLINKS * sizeof(int)));
+    checkCudaErrors(cudaMemcpyToSymbol(CIZ,   &H_CIZ,   FLINKS * sizeof(int)));
+    checkCudaErrors(cudaMemcpyToSymbol(CIX_G, &H_CIX_G, GLINKS * sizeof(int)));
+    checkCudaErrors(cudaMemcpyToSymbol(CIY_G, &H_CIY_G, GLINKS * sizeof(int)));
+    checkCudaErrors(cudaMemcpyToSymbol(CIZ_G, &H_CIZ_G, GLINKS * sizeof(int)));
 
     #ifdef PERTURBATION
         checkCudaErrors(cudaMemcpyToSymbol(DATAZ, &H_DATAZ, 200 * sizeof(float)));

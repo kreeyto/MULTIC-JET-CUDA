@@ -56,8 +56,8 @@ int main(int argc, char* argv[]) {
             gpuFusedCollisionStream<<<numBlocks,threadsPerBlock,0,mainStream>>> (lbm); 
             getLastCudaError("gpuFusedCollisionStream");
 
-            gpuApplyOutflow<<<numBlocksBC,threadsPerBlockBC,0,mainStream>>> (lbm);
-            getLastCudaError("gpuApplyOutflow");
+            //gpuApplyOutflow<<<numBlocksBC,threadsPerBlockBC,0,mainStream>>> (lbm);
+            //getLastCudaError("gpuApplyOutflow");
 
             gpuEvolvePhaseField<<<numBlocks,threadsPerBlock,0,mainStream>>> (lbm); 
             getLastCudaError("gpuEvolvePhaseField");

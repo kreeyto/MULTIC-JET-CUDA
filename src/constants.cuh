@@ -1,6 +1,12 @@
 #pragma once
 using namespace std;
 
+// first distribution velocity set is dealt by compile flags
+// scalar field related velocity set is set here
+#define G_D3Q7
+//#define G_D3Q9 // not yet suported
+//#define G_D3Q15 // not yet suported
+
 #define RUN_MODE
 //#define SAMPLE_MODE
 //#define DEBUG_MODE
@@ -10,34 +16,15 @@ using namespace std;
 #define BLOCK_SIZE_Y 8
 #define BLOCK_SIZE_Z 8
 
-#ifdef D3Q19
-    constexpr int NLINKS = 19;
-#elif defined(D3Q27)
-    constexpr int NLINKS = 27;
-#endif
-
-extern __constant__ float CSSQ;
-extern __constant__ float OMEGA;
-extern __constant__ float GAMMA;
-extern __constant__ float SIGMA;
-extern __constant__ float COEFF_HE;
-
-extern __constant__ float W[NLINKS];
-extern __constant__ int CIX[NLINKS], CIY[NLINKS], CIZ[NLINKS];
-
-#ifdef PERTURBATION
-    extern __constant__ float DATAZ[200];
-#endif
-
 // domain size
 constexpr int MESH = 128;
-constexpr int DIAM = 19;
-constexpr int NX = MESH;
-constexpr int NY = MESH;
-constexpr int NZ = MESH*4;
+constexpr int DIAM = MESH/10; // with 128 mesh max diam is 19
+constexpr int NX   = MESH;
+constexpr int NY   = MESH;
+constexpr int NZ   = MESH*2;
 
 // jet velocity
-constexpr float U_JET = 0.05f;
+constexpr float U_JET = 0.05;
 
 // adimensional parameters
 constexpr int REYNOLDS = 5000;
@@ -50,33 +37,40 @@ constexpr float H_CSSQ     = 1.0f / 3.0f;
 constexpr float H_OMEGA    = 1.0f / H_TAU;
 constexpr float H_GAMMA    = 0.15f * 7.0f;
 constexpr float H_SIGMA    = (U_JET * U_JET * DIAM) / WEBER;
-constexpr float H_COEFF_HE = 1.0f - H_OMEGA / 2.0f;  
-//constexpr float H_COEFF_HE = 0.5f;  
+constexpr float H_COEFF_HE = 1.0f - H_OMEGA / 2.0f; // almost negligible in high re? evaluate using as 0.5f
 
-#ifdef D3Q19 //                 0  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16 17 18  
+// first distribution related
+#ifdef D3Q19 //                 0  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16 17 18 
     constexpr int H_CIX[19] = { 0, 1,-1, 0, 0, 0, 0, 1,-1, 1,-1, 0, 0, 1,-1, 1,-1, 0, 0 };
     constexpr int H_CIY[19] = { 0, 0, 0, 1,-1, 0, 0, 1,-1, 0, 0, 1,-1,-1, 1, 0, 0, 1,-1 };
     constexpr int H_CIZ[19] = { 0, 0, 0, 0, 0, 1,-1, 0, 0, 1,-1, 1,-1, 0, 0,-1, 1,-1, 1 };
+    constexpr float H_W[19] = { 1.0f / 3.0f, 
+                                1.0f / 18.0f, 1.0f / 18.0f, 1.0f / 18.0f, 1.0f / 18.0f, 1.0f / 18.0f, 1.0f / 18.0f,
+                                1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f, 
+                                1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f };
+    constexpr int FLINKS = 19;
 #elif defined(D3Q27) //         0  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26
     constexpr int H_CIX[27] = { 0, 1,-1, 0, 0, 0, 0, 1,-1, 1,-1, 0, 0, 1,-1, 1,-1, 0, 0, 1,-1, 1,-1, 1,-1,-1, 1 };
     constexpr int H_CIY[27] = { 0, 0, 0, 1,-1, 0, 0, 1,-1, 0, 0, 1,-1,-1, 1, 0, 0, 1,-1, 1,-1, 1,-1,-1, 1, 1,-1 };
     constexpr int H_CIZ[27] = { 0, 0, 0, 0, 0, 1,-1, 0, 0, 1,-1, 1,-1, 0, 0,-1, 1,-1, 1, 1,-1,-1, 1, 1,-1, 1,-1 };
+    constexpr float H_W[27] = { 8.0f / 27.0f,
+                                2.0f / 27.0f, 2.0f / 27.0f, 2.0f / 27.0f, 2.0f / 27.0f, 2.0f / 27.0f, 2.0f / 27.0f, 
+                                1.0f / 54.0f, 1.0f / 54.0f, 1.0f / 54.0f, 1.0f / 54.0f, 1.0f / 54.0f, 1.0f / 54.0f, 
+                                1.0f / 54.0f, 1.0f / 54.0f, 1.0f / 54.0f, 1.0f / 54.0f, 1.0f / 54.0f, 1.0f / 54.0f, 
+                                1.0f / 216.0f, 1.0f / 216.0f, 1.0f / 216.0f, 1.0f / 216.0f, 1.0f / 216.0f, 1.0f / 216.0f, 1.0f / 216.0f, 1.0f / 216.0f };
+    constexpr int FLINKS = 27;
 #endif
 
-#ifdef D3Q19
-    constexpr float H_W[19] = {
-        1.0f / 3.0f, 
-        1.0f / 18.0f, 1.0f / 18.0f, 1.0f / 18.0f, 1.0f / 18.0f, 1.0f / 18.0f, 1.0f / 18.0f,
-        1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f, 
-        1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f, 1.0f / 36.0f
-    };
-#elif defined(D3Q27)
-    constexpr float H_W[27] = {
-        8.0f / 27.0f,
-        2.0f / 27.0f, 2.0f / 27.0f, 2.0f / 27.0f, 2.0f / 27.0f, 2.0f / 27.0f, 2.0f / 27.0f, 
-        1.0f / 54.0f, 1.0f / 54.0f, 1.0f / 54.0f, 1.0f / 54.0f, 1.0f / 54.0f, 1.0f / 54.0f, 1.0f / 54.0f, 1.0f / 54.0f, 1.0f / 54.0f, 1.0f / 54.0f, 1.0f / 54.0f, 1.0f / 54.0f, 
-        1.0f / 216.0f, 1.0f / 216.0f, 1.0f / 216.0f, 1.0f / 216.0f, 1.0f / 216.0f, 1.0f / 216.0f, 1.0f / 216.0f, 1.0f / 216.0f
-    };
+// second distribution related
+#ifdef G_D3Q7 //                 0  1  2  3  4  5  6
+    constexpr int H_CIX_G[7] = { 0, 1,-1, 0, 0, 0, 0 };
+    constexpr int H_CIY_G[7] = { 0, 0, 0, 1,-1, 0, 0 };
+    constexpr int H_CIZ_G[7] = { 0, 0, 0, 0, 0, 1,-1 };
+    constexpr float H_W_G[7] = { 1.0f / 4.0f, 
+                                 1.0f / 8.0f, 1.0f / 8.0f, 
+                                 1.0f / 8.0f, 1.0f / 8.0f, 
+                                 1.0f / 8.0f, 1.0f / 8.0f };
+    constexpr int GLINKS = 7;   
 #endif
 
 #ifdef PERTURBATION

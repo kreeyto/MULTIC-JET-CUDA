@@ -15,11 +15,17 @@ __global__ void gpuApplyOutflow(LBMFields d) {
     d.uz[idx3_out]  = d.uz[idx3_prev];
     d.phi[idx3_out] = d.phi[idx3_prev];
 
-    #pragma unroll NLINKS
-    for (int Q = 0; Q < NLINKS; ++Q) {
+    #pragma unroll FLINKS
+    for (int Q = 0; Q < FLINKS; ++Q) {
         const int idx4_out = gpuIdxGlobal4(x,y,z,Q);
         const int idx4_prev = gpuIdxGlobal4(x,y,z-1,Q);
         d.f[idx4_out] = d.f[idx4_prev];
+    }
+    
+    #pragma unroll GLINKS
+    for (int Q = 0; Q < GLINKS; ++Q) {
+        const int idx4_out = gpuIdxGlobal4(x,y,z,Q);
+        const int idx4_prev = gpuIdxGlobal4(x,y,z-1,Q);
         d.g[idx4_out] = d.g[idx4_prev];
     }
 }
@@ -47,7 +53,7 @@ __global__ void gpuApplyInflow(LBMFields d, const int STEP) {
     float phi_in = smoothing_factor;
 
     #ifdef PERTURBATION
-        float uz_in = U_JET * (1.0f + DATAZ[STEP/MACRO_SAVE] * 100) * phi_in; 
+        float uz_in = U_JET * (1.0f + DATAZ[STEP/MACRO_SAVE] * 1000) * phi_in; 
     #else
         float uz_in = U_JET * phi_in; 
     #endif
@@ -67,8 +73,8 @@ __global__ void gpuApplyInflow(LBMFields d, const int STEP) {
     d.uy[idx3_in] = 0.0f;
     d.uz[idx3_in] = uz_in; 
 
-    #pragma unroll NLINKS
-    for (int Q = 0; Q < NLINKS; ++Q) {
+    #pragma unroll FLINKS
+    for (int Q = 0; Q < FLINKS; ++Q) {
         const int xx = x + CIX[Q];
         const int yy = y + CIY[Q];
         const int zz = z + CIZ[Q];
@@ -80,11 +86,11 @@ __global__ void gpuApplyInflow(LBMFields d, const int STEP) {
         d.f[streamed_idx4] = feq + he_force;
     }
 
-    #pragma unroll NLINKS
-    for (int Q = 0; Q < NLINKS; ++Q) {
-        const int xx = x + CIX[Q];
-        const int yy = y + CIY[Q];
-        const int zz = z + CIZ[Q];
+    #pragma unroll GLINKS
+    for (int Q = 0; Q < GLINKS; ++Q) {
+        const int xx = x + CIX_G[Q];
+        const int yy = y + CIY_G[Q];
+        const int zz = z + CIZ_G[Q];
         float geq = gpuComputeEquilibriaFirstOrder(phi_in,0.0f,0.0f,uz_in,Q);
         const int streamed_idx4 = gpuIdxGlobal4(xx,yy,zz,Q);
         d.g[streamed_idx4] = geq;

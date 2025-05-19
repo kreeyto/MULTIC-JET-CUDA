@@ -16,8 +16,8 @@ __device__ __forceinline__ float gpuSmoothstep(float edge0, float edge1, float x
 }
 
 __device__ __forceinline__ float gpuComputeEquilibriaFirstOrder(float density, float ux, float uy, float uz, int Q) {
-    float cu = 3.0f * (ux*CIX[Q] + uy*CIY[Q] + uz*CIZ[Q]);
-    return W[Q] * density * (1.0f + cu);
+    float cu = 3.0f * (ux*CIX_G[Q] + uy*CIY_G[Q] + uz*CIZ_G[Q]);
+    return W_G[Q] * density * (1.0f + cu);
 }
 
 __device__ __forceinline__ float gpuComputeEquilibriaSecondOrder(float density, float ux, float uy, float uz, float uu, int Q) {

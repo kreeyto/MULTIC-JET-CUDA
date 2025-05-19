@@ -12,18 +12,18 @@ __global__ void gpuFusedCollisionStream(LBMFields d) {
 
     const int idx3 = gpuIdxGlobal3(x,y,z);
     
-    float fneq[NLINKS];
-    float pop[NLINKS];
+    float fneq[FLINKS];
+    float pop[FLINKS];
       
-    #pragma unroll NLINKS
-    for (int Q = 0; Q < NLINKS; ++Q) {
+    #pragma unroll FLINKS
+    for (int Q = 0; Q < FLINKS; ++Q) {
         const int idx4 = gpuIdxGlobal4(x,y,z,Q);
         pop[Q] = d.f[idx4];
     }
 
     float rho_val = 0.0f;
-    #pragma unroll NLINKS
-    for (int Q = 0; Q < NLINKS; ++Q) 
+    #pragma unroll FLINKS
+    for (int Q = 0; Q < FLINKS; ++Q) 
         rho_val += pop[Q];
 
     float inv_rho = 1.0f / rho_val;
@@ -53,8 +53,8 @@ __global__ void gpuFusedCollisionStream(LBMFields d) {
     float uu = 1.5f * (ux_val*ux_val + uy_val*uy_val + uz_val*uz_val);
     float inv_rho_cssq = 3.0f * inv_rho;
 
-    #pragma unroll NLINKS
-    for (int Q = 0; Q < NLINKS; ++Q) {
+    #pragma unroll FLINKS
+    for (int Q = 0; Q < FLINKS; ++Q) {
         float pre_feq = gpuComputeEquilibriaSecondOrder(rho_val,ux_val,uy_val,uz_val,uu,Q);
         float he_force = COEFF_HE * pre_feq * ((CIX[Q] - ux_val) * ffx_val +
                                                (CIY[Q] - uy_val) * ffy_val +
@@ -80,8 +80,8 @@ __global__ void gpuFusedCollisionStream(LBMFields d) {
  
     d.ux[idx3] = ux_val; d.uy[idx3] = uy_val; d.uz[idx3] = uz_val;
 
-    #pragma unroll NLINKS
-    for (int Q = 0; Q < NLINKS; ++Q) {
+    #pragma unroll FLINKS
+    for (int Q = 0; Q < FLINKS; ++Q) {
         const int xx = x + CIX[Q];
         const int yy = y + CIY[Q];
         const int zz = z + CIZ[Q];
@@ -121,14 +121,14 @@ __global__ void gpuEvolvePhaseField(LBMFields d) {
     float normz_val = d.normz[idx3];
 
     float phi_norm = GAMMA * phi_val * (1.0f - phi_val);
-    #pragma unroll NLINKS
-    for (int Q = 0; Q < NLINKS; ++Q) {
-        const int xx = x + CIX[Q];
-        const int yy = y + CIY[Q];
-        const int zz = z + CIZ[Q];
+    #pragma unroll GLINKS
+    for (int Q = 0; Q < GLINKS; ++Q) {
+        const int xx = x + CIX_G[Q];
+        const int yy = y + CIY_G[Q];
+        const int zz = z + CIZ_G[Q];
         const int streamed_idx4 = gpuIdxGlobal4(xx,yy,zz,Q);
         float geq = gpuComputeEquilibriaFirstOrder(phi_val,ux_val,uy_val,uz_val,Q);
-        float anti_diff = W[Q] * phi_norm * (CIX[Q] * normx_val + CIY[Q] * normy_val + CIZ[Q] * normz_val);
+        float anti_diff = W_G[Q] * phi_norm * (CIX_G[Q] * normx_val + CIY_G[Q] * normy_val + CIZ_G[Q] * normz_val);
         d.g[streamed_idx4] = geq + anti_diff;
     }
 }

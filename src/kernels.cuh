@@ -1,5 +1,5 @@
 #pragma once
-#include "device_structs.cuh"
+#include "device_header.cuh"
 #include "device_functions.cuh"
 
 __global__ void gpuInitDistributions(LBMFields d);
