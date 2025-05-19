@@ -18,10 +18,10 @@ using namespace std;
 
 // domain size
 constexpr int MESH = 128;
-constexpr int DIAM = MESH/10; // with 128 mesh max diam is 19
+constexpr int DIAM = 19; // with 128 mesh max diam is 19, 64 is 10
 constexpr int NX   = MESH;
 constexpr int NY   = MESH;
-constexpr int NZ   = MESH*2;
+constexpr int NZ   = MESH*4;
 
 // jet velocity
 constexpr float U_JET = 0.05;

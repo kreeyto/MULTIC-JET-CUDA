@@ -24,6 +24,14 @@ struct LBMFields {
     float *ffx, *ffy, *ffz;
     float *f, *g; 
 };
+ 
+/*
+struct DerivedFields {
+    float* ke;         // kinetic energy (local)
+    float* tke;        // turbulent kinetic energy (com média temporal)
+    float* qcriterion;
+}
+*/
 
 extern LBMFields lbm;
 

@@ -31,7 +31,9 @@ int main(int argc, char* argv[]) {
     getLastCudaError("gpuInitDistributions");
 
     vector<float> phi_host(NX * NY * NZ); 
-    //vector<float> uz_host(NX * NY * NZ);
+    //vector<float> ux_host(NX * NY * NZ);
+    //vector<float> uy_host(NX * NY * NZ);
+    vector<float> uz_host(NX * NY * NZ);
 
     auto START_TIME = chrono::high_resolution_clock::now();
     for (int STEP = 0; STEP <= NSTEPS ; ++STEP) {
@@ -56,9 +58,6 @@ int main(int argc, char* argv[]) {
             gpuFusedCollisionStream<<<numBlocks,threadsPerBlock,0,mainStream>>> (lbm); 
             getLastCudaError("gpuFusedCollisionStream");
 
-            //gpuApplyOutflow<<<numBlocksBC,threadsPerBlockBC,0,mainStream>>> (lbm);
-            //getLastCudaError("gpuApplyOutflow");
-
             gpuEvolvePhaseField<<<numBlocks,threadsPerBlock,0,mainStream>>> (lbm); 
             getLastCudaError("gpuEvolvePhaseField");
 
@@ -78,7 +77,9 @@ int main(int argc, char* argv[]) {
         if (STEP % MACRO_SAVE == 0) {
 
             copyAndSaveToBinary(lbm.phi, NX * NY * NZ, SIM_DIR, SIM_ID, STEP, "phi");
-            //copyAndSaveToBinary(lbm.uz, NX * NY * NZ, SIM_DIR, SIM_ID, STEP, "uz");
+            //copyAndSaveToBinary(lbm.ux, NX * NY * NZ, SIM_DIR, SIM_ID, STEP, "ux");
+            //copyAndSaveToBinary(lbm.uy, NX * NY * NZ, SIM_DIR, SIM_ID, STEP, "uy");
+            copyAndSaveToBinary(lbm.uz, NX * NY * NZ, SIM_DIR, SIM_ID, STEP, "uz");
 
             cout << "Passo " << STEP << ": Dados salvos em " << SIM_DIR << endl;
         }
