@@ -23,8 +23,7 @@ __constant__ float COEFF_HE;
 __constant__ float W[FLINKS];
 __constant__ float W_G[GLINKS];
 
-__constant__ int CIX[FLINKS],   CIY[FLINKS],   CIZ[FLINKS];
-__constant__ int CIX_G[GLINKS], CIY_G[GLINKS], CIZ_G[GLINKS];
+__constant__ int CIX[FLINKS], CIY[FLINKS], CIZ[FLINKS];
 
 #ifdef PERTURBATION
     __constant__ float DATAZ[200];
@@ -80,9 +79,6 @@ void initDeviceVars() {
     checkCudaErrors(cudaMemcpyToSymbol(CIX,   &H_CIX,   FLINKS * sizeof(int)));
     checkCudaErrors(cudaMemcpyToSymbol(CIY,   &H_CIY,   FLINKS * sizeof(int)));
     checkCudaErrors(cudaMemcpyToSymbol(CIZ,   &H_CIZ,   FLINKS * sizeof(int)));
-    checkCudaErrors(cudaMemcpyToSymbol(CIX_G, &H_CIX_G, GLINKS * sizeof(int)));
-    checkCudaErrors(cudaMemcpyToSymbol(CIY_G, &H_CIY_G, GLINKS * sizeof(int)));
-    checkCudaErrors(cudaMemcpyToSymbol(CIZ_G, &H_CIZ_G, GLINKS * sizeof(int)));
 
     #ifdef PERTURBATION
         checkCudaErrors(cudaMemcpyToSymbol(DATAZ, &H_DATAZ, 200 * sizeof(float)));

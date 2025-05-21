@@ -1,25 +1,25 @@
 #pragma once
 #include "common.cuh"
 
-__host__ __forceinline__ string createSimulationDirectory(
-    const string& VELOCITY_SET, const string& SIM_ID
+__host__ __forceinline__ std::string createSimulationDirectory(
+    const std::string& VELOCITY_SET, const std::string& SIM_ID
 ) {
-    string BASE_DIR = 
+    std::string BASE_DIR = 
     #ifdef _WIN32
         ".\\";
     #else
         "./";
     #endif
 
-    string SIM_DIR = BASE_DIR + "bin/" + VELOCITY_SET + "/" + SIM_ID + "/";
+    std::string SIM_DIR = BASE_DIR + "bin/" + VELOCITY_SET + "/" + SIM_ID + "/";
     
     #ifdef _WIN32
-        string MKDIR_COMMAND = "mkdir \"" + SIM_DIR + "\"";
+        std::string MKDIR_COMMAND = "mkdir \"" + SIM_DIR + "\"";
     #else
-        string MKDIR_COMMAND = "mkdir -p \"" + SIM_DIR + "\"";
+        std::string MKDIR_COMMAND = "mkdir -p \"" + SIM_DIR + "\"";
     #endif
 
-    int ret = system(MKDIR_COMMAND.c_str());
+    int ret = std::system(MKDIR_COMMAND.c_str());
     (void)ret;
 
     return SIM_DIR;
@@ -28,34 +28,34 @@ __host__ __forceinline__ string createSimulationDirectory(
 __host__ __forceinline__ void computeAndPrintOccupancy() {
     int minGridSize = 0, blockSize = 0;
     cudaError_t err = cudaOccupancyMaxPotentialBlockSize(
-        &minGridSize, &blockSize, gpuFusedCollisionStream, 0, 0);
+        &minGridSize, &blockSize, gpuMomCollisionStream, 0, 0);
     if (err != cudaSuccess) {
-        cerr << "Error in calculating occupancy: " << cudaGetErrorString(err) << endl;
+        std::cerr << "Error in calculating occupancy: " << cudaGetErrorString(err) << std::endl;
         exit(EXIT_FAILURE);
     }
 
     int maxBlocksPerSM = 0;
     cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-        &maxBlocksPerSM, gpuFusedCollisionStream, blockSize, 0);
+        &maxBlocksPerSM, gpuMomCollisionStream, blockSize, 0);
 
-    cout << "\n// =============================================== //\n";
-    cout << "     Optimal block size       : " << blockSize << "\n";
-    cout << "     Minimum grid size        : " << minGridSize << "\n";
-    cout << "     Active blocks per SM     : " << maxBlocksPerSM << "\n";
-    cout << "// =============================================== //\n" << endl;
+    std::cout << "\n// =============================================== //\n";
+    std::cout << "     Optimal block size       : " << blockSize << "\n";
+    std::cout << "     Minimum grid size        : " << minGridSize << "\n";
+    std::cout << "     Active blocks per SM     : " << maxBlocksPerSM << "\n";
+    std::cout << "// =============================================== //\n" << std::endl;
 }
 
 __host__ __forceinline__ void generateSimulationInfoFile(
-    const string& SIM_DIR, const string& SIM_ID, const string& VELOCITY_SET, 
+    const std::string& SIM_DIR, const std::string& SIM_ID, const std::string& VELOCITY_SET, 
     const int NSTEPS, const int MACRO_SAVE, 
     const float TAU, const double MLUPS
 ) {
-    string INFO_FILE = SIM_DIR + SIM_ID + "_info.txt";
+    std::string INFO_FILE = SIM_DIR + SIM_ID + "_info.txt";
     try {
-        ofstream file(INFO_FILE);
+        std::ofstream file(INFO_FILE);
 
         if (!file.is_open()) {
-            cerr << "Error opening file: " << INFO_FILE << endl;
+            std::cerr << "Error opening file: " << INFO_FILE << std::endl;
             return;
         }
 
@@ -75,26 +75,26 @@ __host__ __forceinline__ void generateSimulationInfoFile(
              << "--------------------------------------------------------------------------------\n";
 
         file.close();
-        cout << "Simulation information file created in: " << INFO_FILE << endl;
-    } catch (const exception& e) {
-        cerr << "Error generating information file: " << e.what() << endl;
+        std::cout << "Simulation information file created in: " << INFO_FILE << std::endl;
+    } catch (const std::exception& e) {
+        std::cerr << "Error generating information file: " << e.what() << std::endl;
     }
 }
 
 __host__ __forceinline__ void copyAndSaveToBinary(
-    const float* d_data, size_t SIZE, const string& SIM_DIR, 
-    const string& ID, int STEP, const string& VAR_NAME
+    const float* d_data, size_t SIZE, const std::string& SIM_DIR, 
+    const std::string& ID, int STEP, const std::string& VAR_NAME
 ) {
-    vector<float> host_data(SIZE);
+    std::vector<float> host_data(SIZE);
 
     checkCudaErrors(cudaMemcpy(host_data.data(), d_data, SIZE * sizeof(float), cudaMemcpyDeviceToHost));
 
-    ostringstream FILENAME;
-    FILENAME << SIM_DIR << ID << "_" << VAR_NAME << setw(6) << setfill('0') << STEP << ".bin";
+    std::ostringstream FILENAME;
+    FILENAME << SIM_DIR << ID << "_" << VAR_NAME << std::setw(6) << std::setfill('0') << STEP << ".bin";
 
-    ofstream file(FILENAME.str(), ios::binary);
+    std::ofstream file(FILENAME.str(), std::ios::binary);
     if (!file) {
-        cerr << "Error opening file " << FILENAME.str() << " for writing." << endl;
+        std::cerr << "Error opening file " << FILENAME.str() << " for writing." << std::endl;
         return;
     }
 

@@ -1,6 +1,6 @@
 #include "kernels.cuh"
 
-__global__ void gpuFusedCollisionStream(LBMFields d) {
+__global__ void gpuMomCollisionStream(LBMFields d) {
     const int x = threadIdx.x + blockIdx.x * blockDim.x;
     const int y = threadIdx.y + blockIdx.y * blockDim.y;
     const int z = threadIdx.z + blockIdx.z * blockDim.z;
@@ -11,7 +11,7 @@ __global__ void gpuFusedCollisionStream(LBMFields d) {
         z == 0 || z == NZ-1) return;
 
     const int idx3 = gpuIdxGlobal3(x,y,z);
-    
+        
     float fneq[FLINKS];
     float pop[FLINKS];
       
@@ -120,17 +120,18 @@ __global__ void gpuEvolvePhaseField(LBMFields d) {
     float normy_val = d.normy[idx3];
     float normz_val = d.normz[idx3];
 
-    float phi_norm = GAMMA * phi_val * (1.0f - phi_val);
-    #pragma unroll GLINKS
-    for (int Q = 0; Q < GLINKS; ++Q) {
-        const int xx = x + CIX_G[Q];
-        const int yy = y + CIY_G[Q];
-        const int zz = z + CIZ_G[Q];
-        const int streamed_idx4 = gpuIdxGlobal4(xx,yy,zz,Q);
-        float geq = gpuComputeEquilibriaFirstOrder(phi_val,ux_val,uy_val,uz_val,Q);
-        float anti_diff = W_G[Q] * phi_norm * (CIX_G[Q] * normx_val + CIY_G[Q] * normy_val + CIZ_G[Q] * normz_val);
-        d.g[streamed_idx4] = geq + anti_diff;
-    }
+    float phi_norm = GAMMA * (1.0f - phi_val);
+    float phi_term_x = 3.0f * ux_val + phi_norm * normx_val;
+    float phi_term_y = 3.0f * uy_val + phi_norm * normy_val;
+    float phi_term_z = 3.0f * uz_val + phi_norm * normz_val;
+    d.g[gpuIdxGlobal4(x,y,z,0)]   = W_G[0] * phi_val;
+    d.g[gpuIdxGlobal4(x+1,y,z,1)] = W_G[1] * phi_val * (1.0f + phi_term_x);
+    d.g[gpuIdxGlobal4(x-1,y,z,2)] = W_G[2] * phi_val * (1.0f - phi_term_x);
+    d.g[gpuIdxGlobal4(x,y+1,z,3)] = W_G[3] * phi_val * (1.0f + phi_term_y);
+    d.g[gpuIdxGlobal4(x,y-1,z,4)] = W_G[4] * phi_val * (1.0f - phi_term_y);
+    d.g[gpuIdxGlobal4(x,y,z+1,5)] = W_G[5] * phi_val * (1.0f + phi_term_z);
+    d.g[gpuIdxGlobal4(x,y,z-1,6)] = W_G[6] * phi_val * (1.0f - phi_term_z);
+    
 }
 
 

@@ -10,8 +10,7 @@ extern __constant__ float COEFF_HE;
 extern __constant__ float W[FLINKS];
 extern __constant__ float W_G[GLINKS];
 
-extern __constant__ int CIX[FLINKS],   CIY[FLINKS],   CIZ[FLINKS];
-extern __constant__ int CIX_G[GLINKS], CIY_G[GLINKS], CIZ_G[GLINKS];
+extern __constant__ int CIX[FLINKS], CIY[FLINKS], CIZ[FLINKS];
 
 #ifdef PERTURBATION
     extern __constant__ float DATAZ[200];

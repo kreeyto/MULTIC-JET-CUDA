@@ -1,5 +1,4 @@
 #pragma once
-using namespace std;
 
 // first distribution velocity set is dealt by compile flags
 // scalar field related velocity set is set here
@@ -17,11 +16,11 @@ using namespace std;
 #define BLOCK_SIZE_Z 8
 
 // domain size
-constexpr int MESH = 128;
-constexpr int DIAM = 19; // with 128 mesh max diam is 19, 64 is 10
+constexpr int MESH = 64;
+constexpr int DIAM = 10; // with 128 mesh max diam is 19
 constexpr int NX   = MESH;
 constexpr int NY   = MESH;
-constexpr int NZ   = MESH*4;
+constexpr int NZ   = MESH*2;
 
 // jet velocity
 constexpr float U_JET = 0.05;
@@ -37,7 +36,8 @@ constexpr float H_CSSQ     = 1.0f / 3.0f;
 constexpr float H_OMEGA    = 1.0f / H_TAU;
 constexpr float H_GAMMA    = 0.15f * 7.0f;
 constexpr float H_SIGMA    = (U_JET * U_JET * DIAM) / WEBER;
-constexpr float H_COEFF_HE = 1.0f - H_OMEGA / 2.0f; // almost negligible in high re? evaluate using as 0.5f
+//constexpr float H_COEFF_HE = 1.0f - H_OMEGA / 2.0f; // almost negligible in high re? evaluate using as 0.5f
+constexpr float H_COEFF_HE = 0.5f; // fixed approximation of (1-omega/2), valid in high re limitations
 
 // first distribution related
 #ifdef D3Q19 //                 0  1  2  3  4  5  6  7  8  9  10 11 12 13 14 15 16 17 18 
@@ -62,10 +62,8 @@ constexpr float H_COEFF_HE = 1.0f - H_OMEGA / 2.0f; // almost negligible in high
 #endif
 
 // second distribution related
-#ifdef G_D3Q7 //                 0  1  2  3  4  5  6
-    constexpr int H_CIX_G[7] = { 0, 1,-1, 0, 0, 0, 0 };
-    constexpr int H_CIY_G[7] = { 0, 0, 0, 1,-1, 0, 0 };
-    constexpr int H_CIZ_G[7] = { 0, 0, 0, 0, 0, 1,-1 };
+#ifdef G_D3Q7
+    // velocity set isn't needed since the first 7 components of each direction are the same as d3q19
     constexpr float H_W_G[7] = { 1.0f / 4.0f, 
                                  1.0f / 8.0f, 1.0f / 8.0f, 
                                  1.0f / 8.0f, 1.0f / 8.0f, 

@@ -3,14 +3,14 @@
 
 int main(int argc, char* argv[]) {
     if (argc < 3) {
-        cerr << "Error: Usage: " << argv[0] << " <velocity set> <ID>" << endl;
+        std::cerr << "Error: Usage: " << argv[0] << " <velocity set> <ID>" << std::endl;
         return 1;
     }
-    string VELOCITY_SET = argv[1];
-    string SIM_ID = argv[2];
+    std::string VELOCITY_SET = argv[1];
+    std::string SIM_ID = argv[2];
 
-    string SIM_DIR = createSimulationDirectory(VELOCITY_SET,SIM_ID);
-    computeAndPrintOccupancy();
+    std::string SIM_DIR = createSimulationDirectory(VELOCITY_SET,SIM_ID);
+    //computeAndPrintOccupancy();
     initDeviceVars();
 
     // ================================================================================================== //
@@ -30,61 +30,63 @@ int main(int argc, char* argv[]) {
     gpuInitDistributions<<<numBlocks,threadsPerBlock,0,mainStream>>> (lbm); 
     getLastCudaError("gpuInitDistributions");
 
-    vector<float> phi_host(NX * NY * NZ); 
-    //vector<float> ux_host(NX * NY * NZ);
-    //vector<float> uy_host(NX * NY * NZ);
-    vector<float> uz_host(NX * NY * NZ);
-
-    auto START_TIME = chrono::high_resolution_clock::now();
+    auto START_TIME = std::chrono::high_resolution_clock::now();
     for (int STEP = 0; STEP <= NSTEPS ; ++STEP) {
-        cout << "Passo " << STEP << " de " << NSTEPS << " iniciado..." << endl;
+        std::cout << "Passo " << STEP << " de " << NSTEPS << " iniciado..." << std::endl;
 
-        // ======================= INTERFACE ======================= //
+        // =================================== BOUNDARY =================================== //
+
+            gpuApplyInflow<<<numBlocksBC,threadsPerBlockBC,0,mainStream>>> (lbm,STEP); 
+            getLastCudaError("gpuApplyInflow");
+
+        // ================================================================================ //
+
+        // ================================== INTERFACE ================================== //
 
             gpuComputePhaseField<<<numBlocks,threadsPerBlock,0,mainStream>>> (lbm); 
             getLastCudaError("gpuComputePhaseField");
-
             gpuComputeGradients<<<numBlocks,threadsPerBlock,0,mainStream>>> (lbm); 
             getLastCudaError("gpuComputeGradients");
             gpuComputeCurvature<<<numBlocks,threadsPerBlock,0,mainStream>>> (lbm); 
             getLastCudaError("gpuComputeCurvature");
 
-        // ======================================================== // 
+        // ============================================================================== // 
 
         
 
-        // ==================== COLLISION & STREAMING ==================== //
+        // ========================= COLLISION & STREAMING ========================= //
             
-            gpuFusedCollisionStream<<<numBlocks,threadsPerBlock,0,mainStream>>> (lbm); 
-            getLastCudaError("gpuFusedCollisionStream");
-
+            gpuMomCollisionStream<<<numBlocks,threadsPerBlock,0,mainStream>>> (lbm); 
+            getLastCudaError("gpuMomCollisionStream");
             gpuEvolvePhaseField<<<numBlocks,threadsPerBlock,0,mainStream>>> (lbm); 
             getLastCudaError("gpuEvolvePhaseField");
 
-        // =============================================================== //    
+        // ========================================================================= //    
 
+        // =================================== BOUNDARIES =================================== //
 
-    
-        // ========================================== BOUNDARY ========================================== //
+            gpuReconstructBoundaries<<<numBlocksBC,threadsPerBlockBC,0,mainStream>>> (lbm); 
+            getLastCudaError("gpuReconstructBoundaries");
 
-            gpuApplyInflow<<<numBlocksBC,threadsPerBlockBC,0,mainStream>>> (lbm,STEP); 
-            getLastCudaError("gpuApplyInflow");
+            //gpuApplyOutflow<<<numBlocks,threadsPerBlock,0,mainStream>>> (lbm);
+            //getLastCudaError("gpuApplyOutflow");
 
-        // ============================================================================================= //
+        // ================================================================================== //
 
         checkCudaErrors(cudaDeviceSynchronize());
 
         if (STEP % MACRO_SAVE == 0) {
 
             copyAndSaveToBinary(lbm.phi, NX * NY * NZ, SIM_DIR, SIM_ID, STEP, "phi");
+            //copyAndSaveToBinary(lbm.rho, NX * NY * NZ, SIM_DIR, SIM_ID, STEP, "rho");
             //copyAndSaveToBinary(lbm.ux, NX * NY * NZ, SIM_DIR, SIM_ID, STEP, "ux");
             //copyAndSaveToBinary(lbm.uy, NX * NY * NZ, SIM_DIR, SIM_ID, STEP, "uy");
-            copyAndSaveToBinary(lbm.uz, NX * NY * NZ, SIM_DIR, SIM_ID, STEP, "uz");
+            //copyAndSaveToBinary(lbm.uz, NX * NY * NZ, SIM_DIR, SIM_ID, STEP, "uz");
 
-            cout << "Passo " << STEP << ": Dados salvos em " << SIM_DIR << endl;
+            std::cout << "Passo " << STEP << ": Dados salvos em " << SIM_DIR << std::endl;
         }
     }
-    auto END_TIME = chrono::high_resolution_clock::now();
+    auto END_TIME = std::chrono::high_resolution_clock::now();
 
     checkCudaErrors(cudaStreamDestroy(mainStream));
     cudaFree(lbm.f); cudaFree(lbm.g);
@@ -93,14 +95,14 @@ int main(int argc, char* argv[]) {
     cudaFree(lbm.normx); cudaFree(lbm.normy); cudaFree(lbm.normz);
     cudaFree(lbm.ffx); cudaFree(lbm.ffy); cudaFree(lbm.ffz); cudaFree(lbm.ind);
 
-    chrono::duration<double> ELAPSED_TIME = END_TIME - START_TIME;
+    std::chrono::duration<double> ELAPSED_TIME = END_TIME - START_TIME;
     long long TOTAL_CELLS = static_cast<long long>(NX) * NY * NZ * NSTEPS;
     double MLUPS = static_cast<double>(TOTAL_CELLS) / (ELAPSED_TIME.count() * 1e6);
 
-    cout << "\n// =============================================== //\n";
-    cout << "     Total execution time    : " << ELAPSED_TIME.count() << " seconds\n";
-    cout << "     Performance             : " << MLUPS << " MLUPS\n";
-    cout << "// =============================================== //\n" << endl;
+    std::cout << "\n// =============================================== //\n";
+    std::cout << "     Total execution time    : " << ELAPSED_TIME.count() << " seconds\n";
+    std::cout << "     Performance             : " << MLUPS << " MLUPS\n";
+    std::cout << "// =============================================== //\n" << std::endl;
 
     generateSimulationInfoFile(SIM_DIR,SIM_ID,VELOCITY_SET,NSTEPS,MACRO_SAVE,H_TAU,MLUPS);
     getLastCudaError("Final sync");

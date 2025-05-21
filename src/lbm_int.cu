@@ -31,26 +31,9 @@ __global__ void gpuComputeGradients(LBMFields d) {
 
     const int idx3 = gpuIdxGlobal3(x,y,z);
 
-    float grad_phi_x = 0.0f, grad_phi_y = 0.0f, grad_phi_z = 0.0f;
-    #pragma unroll GLINKS
-    for (int Q = 0; Q < GLINKS; ++Q) {
-        const int xx = x + CIX_G[Q];
-        const int yy = y + CIY_G[Q];
-        const int zz = z + CIZ_G[Q];
-        const int propagated_idx3 = gpuIdxGlobal3(xx,yy,zz);
-
-        float phi_prop = d.phi[propagated_idx3];
-        float coeff = 3.0f * W_G[Q];
-        grad_phi_x += coeff * CIX_G[Q] * phi_prop;
-        grad_phi_y += coeff * CIY_G[Q] * phi_prop;
-        grad_phi_z += coeff * CIZ_G[Q] * phi_prop;
-    }
-
-    /*
     float grad_phi_x = 3.0f * (W_G[1] * d.phi[gpuIdxGlobal3(x+1,y,z)] - W_G[2] * d.phi[gpuIdxGlobal3(x-1,y,z)]);
     float grad_phi_y = 3.0f * (W_G[3] * d.phi[gpuIdxGlobal3(x,y+1,z)] - W_G[4] * d.phi[gpuIdxGlobal3(x,y-1,z)]);
     float grad_phi_z = 3.0f * (W_G[5] * d.phi[gpuIdxGlobal3(x,y,z+1)] - W_G[6] * d.phi[gpuIdxGlobal3(x,y,z-1)]);
-    */
 
     float squared = grad_phi_x*grad_phi_x + grad_phi_y*grad_phi_y + grad_phi_z*grad_phi_z;
     float mag = rsqrtf(fmaxf(squared,1e-9f));
@@ -81,29 +64,13 @@ __global__ void gpuComputeCurvature(LBMFields d) {
     float normy_val = d.normy[idx3];
     float normz_val = d.normz[idx3];
     float ind_val = d.ind[idx3];
-    float curvature = 0.0f;
-    #pragma unroll GLINKS
-    for (int Q = 0; Q < GLINKS; ++Q) {
-        const int xx = x + CIX_G[Q];
-        const int yy = y + CIY_G[Q];
-        const int zz = z + CIZ_G[Q];
-        const int propagated_idx3 = gpuIdxGlobal3(xx,yy,zz);
-        
-        float normx_prop = d.normx[propagated_idx3];
-        float normy_prop = d.normy[propagated_idx3];
-        float normz_prop = d.normz[propagated_idx3];
-        float coeff_curv = 3.0f * W_G[Q];
-        curvature -= coeff_curv * (CIX_G[Q]*normx_prop + CIY_G[Q]*normy_prop + CIZ_G[Q]*normz_prop);
-    }
 
-    /*
     float curvature = -3.0f * ( W_G[1] * d.normx[gpuIdxGlobal3(x+1,y,z)] 
                               - W_G[2] * d.normx[gpuIdxGlobal3(x-1,y,z)] 
                               + W_G[3] * d.normy[gpuIdxGlobal3(x,y+1,z)] 
                               - W_G[4] * d.normy[gpuIdxGlobal3(x,y-1,z)]
                               + W_G[5] * d.normz[gpuIdxGlobal3(x,y,z+1)]
                               - W_G[6] * d.normz[gpuIdxGlobal3(x,y,z-1)] );
-    */
 
     float coeff_force = SIGMA * curvature;
     d.ffx[idx3] = coeff_force * normx_val * ind_val;
